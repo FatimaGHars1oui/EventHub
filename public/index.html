@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventHub Fès | Plateforme d'événements</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary-color: #007bff; }
+        .hero-section { background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?q=80&w=2070'); background-size: cover; background-position: center; color: white; padding: 80px 0; }
+        .event-card { transition: transform 0.3s; border: none; border-radius: 15px; overflow: hidden; }
+        .event-card:hover { transform: translateY(-10px); }
+        .category-pill { cursor: pointer; transition: all 0.3s; white-space: nowrap; }
+        .category-pill:hover { background-color: var(--primary-color) !important; color: white !important; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="index.html text-white">Event<span class="text-primary">Hub</span></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <form id="search-form" class="d-flex mx-auto w-50">
+                    <input id="search-input" class="form-control me-2" type="search" placeholder="Rechercher à Fès...">
+                    <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i></button>
+                </form>
+                <div id="auth-section" class="navbar-nav ms-auto">
+                    </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero-section text-center">
+        <div class="container">
+            <h1 class="display-4 fw-bold">Événements Culturels à Fès</h1>
+            <p class="lead">Découvrez les festivals, conférences et expositions dans la capitale spirituelle.</p>
+        </div>
+    </header>
+
+    <main class="container my-5">
+        <section class="mb-5">
+            <h5 class="mb-3"><i class="fas fa-tags me-2"></i>Catégories</h5>
+            <div id="categories-nav" class="d-flex gap-2 overflow-x-auto pb-2">
+                <span class="badge bg-white text-dark border p-2 px-3 category-pill" onclick="fetchEvents()">Tout</span>
+            </div>
+        </section>
+
+        <section>
+            <h5 class="mb-4"><i class="fas fa-calendar-alt me-2"></i>Prochains événements</h5>
+            <div id="events-container" class="row">
+                <div class="text-center w-100"><div class="spinner-border text-primary"></div></div>
+            </div>
+        </section>
+    </main>
+
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Connexion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="login-form">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" id="login-email" class="form-control" required placeholder="admin@example.com">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mot de passe</label>
+                            <input type="password" id="login-password" class="form-control" required placeholder="password">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary w-100">Se connecter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
+    <div class="modal fade" id="addEventModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Publier un événement à Fès</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="event-form" enctype="multipart/form-data">
+                <div class="modal-body row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Titre</label>
+                        <input type="text" name="title" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Catégorie</label>
+                        <select name="category_id" id="category-select" class="form-select" required></select>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Ville</label>
+                        <input type="text" name="city" class="form-control" value="Fès" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Prix (MAD)</label>
+                        <input type="number" name="price" class="form-control" value="0" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Capacité</label>
+                        <input type="number" name="max_attendees" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Date de début</label>
+                        <input type="datetime-local" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Date de fin</label>
+                        <input type="datetime-local" name="end_date" class="form-control" required>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label">Lieu (Adresse)</label>
+                        <input type="text" name="venue_address" class="form-control" required>
+                        <input type="hidden" name="venue_name" value="Standard Venue">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label">Image de l'événement</label>
+                        <input type="file" name="image" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100">Soumettre pour validation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>
