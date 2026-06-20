@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use App\Models\Event;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use App\Models\Booking;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class BookingController extends Controller
 {
-    
-
+    /**
+     * البحث عن حجز معين بواسطة الرقم الفريد
+     */
     public function search(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -21,23 +24,21 @@ class BookingController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Numéro de réservation requis',
                 'errors' => $validator->errors()
             ], 422);
+        }
 
-            }
+        $booking = Booking::with(['event', 'user'])
+            ->where('booking_number', $request->booking_number)
+            ->first();
 
-        $booking = Booking::with(['event','event.category', 'user'])
-                ->where('booking_number', $request->booking_number)
-                ->first();
-
-         if (!$booking) {
+        if (!$booking) {
             return response()->json([
-                'success' => false,
+                'success' => false, 
                 'message' => 'Réservation non trouvée'
-            ], 404);       
-    }
-    
+            ], 404);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $booking
@@ -45,7 +46,7 @@ class BookingController extends Controller
     }
 
     /**
-     * إنشاء حجز جديد
+     * إنشاء حجز جديد (معالجة الأحداث المجانية والمدفوعة)
      */
     public function store(Request $request): JsonResponse
     {
@@ -54,48 +55,81 @@ class BookingController extends Controller
             'quantity' => 'required|integer|min:1',
             'attendee_name' => 'required|string|max:255',
             'attendee_email' => 'required|email',
-            'attendee_phone' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        // جلب بيانات الحدث
-        $event = \App\Models\Event::findOrFail($request->event_id);
+        $event = Event::findOrFail($request->event_id);
 
-        // التأكد من توفر المقاعد
+        // 1. التحقق من توفر الأماكن
         if ($event->max_attendees && ($event->current_attendees + $request->quantity) > $event->max_attendees) {
             return response()->json([
-                'success' => false, 
-                'message' => 'Désolé, places insuffisantes.'
+                'success' => false,
+                'message' => 'Désolé, il n\'y a plus de places disponibles.'
             ], 400);
         }
 
-        // إنشاء الحجز
+        // 2. تحديد حالة الدفع (إذا كان السعر 0 تصبح "paid" مباشرة)
+        $isFree = ($event->price == 0 || $event->is_free);
+        
         $booking = Booking::create([
-            'user_id' => $request->user()->id, // المستخدم المتصل
+            'user_id' => $request->user()->id,
             'event_id' => $event->id,
             'quantity' => $request->quantity,
             'unit_price' => $event->price,
             'total_amount' => $event->price * $request->quantity,
-            'currency' => $event->currency,
+            'currency' => $event->currency ?? 'MAD',
             'attendee_name' => $request->attendee_name,
             'attendee_email' => $request->attendee_email,
-            'attendee_phone' => $request->attendee_phone,
             'status' => 'confirmed',
-            'payment_status' => $event->is_free ? 'paid' : 'pending',
+            'payment_status' => $isFree ? 'paid' : 'pending',
+            'confirmed_at' => now(),
         ]);
 
-        // تحديث عدد الحاضرين في الحدث
-        $event->incrementAttendees($request->quantity);
+        // 3. تحديث عدد الحاضرين في الحدث
+        $event->increment('current_attendees', $request->quantity);
 
         return response()->json([
             'success' => true,
             'message' => 'Réservation réussie',
-            'booking_number' => $booking->booking_number, // كيتولد تلقائياً
-            'data' => $booking->load('event')
+            'booking_number' => $booking->booking_number,
+            'data' => $booking
         ], 201);
+    }
+
+    /**
+     * جلب بيانات التذكرة مع الـ QR Code بصيغة SVG
+     */
+    public function getTicketData(Request $request, $booking_number): JsonResponse
+    {
+        $booking = Booking::with(['event', 'event.category'])
+            ->where('booking_number', $booking_number)
+            ->first();
+
+        if (!$booking) {
+            return response()->json(['success' => false, 'message' => 'Ticket introuvable'], 404);
+        }
+
+        // تأمين: لا يمكن لأي مستخدم رؤية تذكرة غيره (إلا إذا كان أدمن)
+        $user = $request->user();
+        if (!$user || ($user->id !== $booking->user_id && $user->role !== 'admin')) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
+        }
+
+        // توليد الـ QR Code يحتوي على رابط التحقق أو رقم الحجز
+        $qrCode = QrCode::size(150)
+            ->color(0, 51, 102) // لون أزرق غامق احترافي
+            ->generate($booking->booking_number);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'booking' => $booking,
+                'qr_code' => (string) $qrCode // إرساله كـ SVG ليتم عرضه في الـ HTML
+            ]
+        ]);
     }
 
     /**
@@ -104,7 +138,7 @@ class BookingController extends Controller
     public function myBookings(Request $request): JsonResponse
     {
         $bookings = $request->user()->bookings()
-            ->with(['event', 'event.category'])
+            ->with(['event'])
             ->orderBy('created_at', 'desc')
             ->get();
 

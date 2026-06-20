@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | EventHub Fès</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root { --sidebar-width: 250px; --primary: #0d6efd; }
+        body { background: #f4f7f6; font-family: 'Poppins', sans-serif; }
+        #sidebar { width: var(--sidebar-width); height: 100vh; position: fixed; background: #212529; color: white; transition: 0.3s; }
+        #content { margin-left: var(--sidebar-width); padding: 30px; }
+        .nav-link { color: rgba(255,255,255,0.7); padding: 12px 20px; border-radius: 0; }
+        .nav-link:hover, .nav-link.active { background: var(--primary); color: white; }
+        .stat-card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="p-4 text-center border-bottom border-secondary">
+            <h4 class="fw-bold m-0">Event<span class="text-primary">Hub</span></h4>
+            <small id="user-role" class="badge bg-primary mt-2"></small>
+        </div>
+        <nav class="nav flex-column mt-3">
+            <a class="nav-link active" href="#" onclick="dash.showTab('overview')"><i class="fas fa-home me-2"></i>Vue d'ensemble</a>
+            <a class="nav-link" id="link-events" href="#" onclick="dash.showTab('events')"><i class="fas fa-calendar-alt me-2"></i>Mes Événements</a>
+            <a class="nav-link" href="#" onclick="dash.showTab('bookings')"><i class="fas fa-ticket-alt me-2"></i>Mes Réservations</a>
+            <hr class="mx-3 border-secondary">
+            <a class="nav-link text-danger" href="index.html"><i class="fas fa-arrow-left me-2"></i>Retour au site</a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h2 id="tab-title" class="fw-bold">Vue d'ensemble</h2>
+            <div class="dropdown">
+                <button class="btn btn-white shadow-sm dropdown-toggle rounded-pill px-3" data-bs-toggle="dropdown">
+                    <span id="user-name"></span>
+                </button>
+                <ul class="dropdown-menu border-0 shadow">
+                    <li><a class="dropdown-item" href="#" onclick="auth.logout()">Déconnexion</a></li>
+                </ul>
+            </div>
+        </header>
+
+        <!-- Stats Section (Overview) -->
+        <div id="tab-overview" class="row g-4 dash-tab">
+            <div class="col-md-4">
+                <div class="card stat-card p-4 bg-white text-center">
+                    <h6 class="text-muted">Total Réservations</h6>
+                    <h2 id="stat-bookings" class="fw-bold">0</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card p-4 bg-primary text-white text-center">
+                    <h6>Dépenses/Revenus</h6>
+                    <h2 id="stat-money" class="fw-bold">0 MAD</h2>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card p-4 bg-white text-center">
+                    <h6 class="text-muted">Événements Actifs</h6>
+                    <h2 id="stat-events" class="fw-bold">0</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table Section -->
+        <div id="tab-data" class="mt-5 dash-tab">
+            <div class="table-container">
+                <table class="table table-hover align-middle">
+                    <thead id="table-head" class="table-light"></thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script> <!-- نستخدم نفس ملف الـ Logic الأساسي -->
+    <script src="js/dashboard.js"></script> <!-- ملف جديد لمنطق اللوحة -->
+</body>
+</html>

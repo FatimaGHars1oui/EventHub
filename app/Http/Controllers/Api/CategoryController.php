@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
@@ -49,4 +50,15 @@ class CategoryController extends Controller
             'data' => $categories
         ]);
     }
+    public function store(Request $request) {
+    $validated = $request->validate(['name' => 'required|unique:categories', 'icon' => 'nullable']);
+    $validated['slug'] = Str::slug($validated['name']);
+    $category = Category::create($validated);
+    return response()->json(['success' => true, 'data' => $category]);
+}
+
+public function destroy(Category $category) {
+    $category->delete();
+    return response()->json(['success' => true, 'message' => 'Supprimé']);
+}
 }

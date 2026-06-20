@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
@@ -16,41 +17,49 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Admin User',
                 'email' => 'admin@example.com',
-                'password' => bcrypt('password'),
+                'password' => Hash::make('password'),
                 'role' => 'admin',
             ],
             [
                 'name' => 'Technology Organizer',
                 'email' => 'technology@example.com',
-                'password' => bcrypt('password'),
+                'password' => Hash::make('password'),
                 'role' => 'organizer',
             ],
             [
-                'name' => 'Music',
+                'name' => 'Music Organizer',
                 'email' => 'music@example.com',
-                'password' => bcrypt('password'),
+                'password' => Hash::make('password'),
                 'role' => 'organizer',
             ],
             [
                 'name' => 'Art Organizer',
                 'email' => 'art@example.com',
-                'password' => bcrypt('password'),
+                'password' => Hash::make('password'),
                 'role' => 'organizer',
             ],
             [
                 'name' => 'Regular User',
                 'email' => 'regular@example.com',
-                'password' => bcrypt('password'),
+                'password' => Hash::make('password'),
                 'role' => 'user',
             ],
-['name' => 'Crafts Organizer', 'email' => 'crafts@example.com', 'role' => 'organizer'],
-['name' => 'Film Organizer',   'email' => 'film@example.com',   'role' => 'organizer']
-
+            [
+                'name' => 'Crafts Organizer', 
+                'email' => 'crafts@example.com', 
+                'password' => Hash::make('password'), // أضفنا كلمة المرور هنا
+                'role' => 'organizer'
+            ],
+            [
+                'name' => 'Film Organizer',   
+                'email' => 'film@example.com',   
+                'password' => Hash::make('password'), // أضفنا كلمة المرور هنا
+                'role' => 'organizer'
+            ]
         ];
 
         foreach ($users as $user) {
-            \App\Models\User::create($user);
+            User::create($user);
         }
-
     }
 }

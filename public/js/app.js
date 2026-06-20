@@ -1,254 +1,307 @@
 /**
  * EventHub Fès - Logiciel de gestion d'événements
+ * Version: 4.0.0 (Final Stable Release)
  */
 
 const API_URL = "http://127.0.0.1:8000/api";
 
 // 1. إدارة الحالة (State Management)
 const state = {
-    token: localStorage.getItem('user_token'),
-    user: JSON.parse(localStorage.getItem('user_data')),
-    currentCategory: null
+    get token() { return localStorage.getItem('user_token'); },
+    get user() { 
+        const data = localStorage.getItem('user_data');
+        try { return data ? JSON.parse(data) : null; } catch(e) { return null; }
+    },
+    events: [],
+    categories: []
 };
 
-// 2. إعدادات الـ Headers
-const getHeaders = () => {
-    const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    };
-    if (state.token) headers['Authorization'] = `Bearer ${state.token}`; // [cite: 8]
-    return headers;
-};
+// 2. مساعدات الـ API (API Helpers)
+const api = {
+    headers(isFormData = false) {
+        const h = { 'Accept': 'application/json' };
+        if (!isFormData) h['Content-Type'] = 'application/json';
+        if (state.token) h['Authorization'] = `Bearer ${state.token}`;
+        return h;
+    },
 
-// 3. جلب الأحداث (Events)
-async function fetchEvents(filters = {}) {
-    const container = document.getElementById('events-container');
-    container.innerHTML = '<div class="text-center w-100"><div class="spinner-border text-primary"></div></div>';
+    async request(endpoint, method = 'GET', data = null, isFormData = false) {
+        const options = { method, headers: this.headers(isFormData) };
+        if (data) options.body = isFormData ? data : JSON.stringify(data);
 
-    try {
-        const params = new URLSearchParams(filters).toString();
-        const response = await fetch(`${API_URL}/events?${params}`); // [cite: 12]
-        const result = await response.json();
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, options);
+            
+            // التعامل مع الجلسة المنتهية
+            if (response.status === 401) {
+                if (state.token) {
+                    localStorage.clear();
+                    alert("Votre session a expiré. Veuillez vous reconnecter.");
+                    window.location.reload();
+                }
+                return { success: false, message: "Non authentifié" };
+            }
 
-        if (result.success) {
-            renderEvents(result.data); // [cite: 12]
+            return await response.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return { success: false, message: "Erreur de connexion au serveur." };
         }
-    } catch (error) {
-        container.innerHTML = '<div class="alert alert-danger w-100">Erreur de connexion au serveur.</div>';
     }
-}
+};
 
-// 4. جلب الأصناف (Categories)
-async function fetchCategories() {
-    try {
-        const response = await fetch(`${API_URL}/categories`); // 
-        const result = await response.json();
-        if (result.success) renderCategories(result.data);
-    } catch (error) { console.error("Categories error:", error); }
-}
+// 3. التحكم في الواجهة (UI Controller)
+const ui = {
+    renderEvents(eventsList) {
+        const container = document.getElementById('events-container');
+        if (!container) return;
 
-// 5. عرض الأحداث في الـ DOM
-function renderEvents(events) {
-    const container = document.getElementById('events-container');
-    if (events.length === 0) {
-        container.innerHTML = '<div class="col-12 text-center py-5"><h5>Aucun événement trouvé à Fès.</h5></div>';
-        return;
-    }
+        if (!eventsList || eventsList.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center py-5"><h5 class="text-muted">Aucun événement trouvé à Fès.</h5></div>';
+            return;
+        }
 
-    container.innerHTML = events.map(event => `
-        <div class="col-md-4 mb-4">
-            <div class="card h-100 event-card shadow-sm">
-                <img src="${event.image_url}" class="card-img-top" alt="${event.title}" style="height:200px; object-fit:cover;">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="badge" style="background-color: ${event.category.color}">${event.category.name}</span>
-                        <small class="text-muted"><i class="fas fa-map-marker-alt"></i> ${event.city}</small>
+        container.innerHTML = eventsList.map(event => `
+            <div class="col-md-4 mb-4" data-aos="fade-up">
+                <div class="card h-100 event-card border-0 shadow-sm">
+                    <div class="position-relative">
+                        <img src="${event.image_url}" class="card-img-top" style="height:220px; object-fit:cover;">
+                        ${event.price == 0 ? '<span class="badge bg-success position-absolute top-0 end-0 m-3 shadow">GRATUIT</span>' : ''}
                     </div>
-                    <h5 class="card-title text-truncate">${event.title}</h5>
-                    <p class="card-text text-muted small">${event.short_description || 'Pas de description.'}</p>
-                    <hr>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold text-primary">${event.formatted_price}</span>
-                        <button onclick="bookingAction(${event.id})" class="btn btn-sm btn-primary px-3">Réserver</button>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-primary rounded-pill px-3">${event.category?.name || 'Général'}</span>
+                            <small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${event.city}</small>
+                        </div>
+                        <h5 class="card-title fw-bold text-truncate">${event.title}</h5>
+                        <p class="card-text text-muted small text-truncate-2">${event.description.substring(0, 100)}...</p>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                <span class="d-block fw-bold text-primary fs-5">${event.formatted_price}</span>
+                                <small class="text-muted" style="font-size: 11px;">${event.available_spots || 0} places restantes</small>
+                            </div>
+                            <button onclick="bookingFlow.initiateBooking(${event.id})" class="btn btn-primary rounded-pill px-4 btn-sm fw-bold shadow-sm">
+                                ${event.price == 0 ? 'Réserver' : 'Acheter'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    `).join('');
-}
+        `).join('');
+    },
 
-function renderCategories(categories) {
-    const nav = document.getElementById('categories-nav');
-    nav.innerHTML += categories.map(cat => `
-        <span class="badge bg-white text-dark border p-2 px-3 category-pill" 
-              onclick="fetchEvents({category_id: ${cat.id}})">
-              <i class="${cat.icon} me-1"></i> ${cat.name}
-        </span>
-    `).join('');
-}
+    renderCategories(categories) {
+        const nav = document.getElementById('categories-nav');
+        if (!nav) return;
+        const catsHtml = categories.map(cat => `
+            <div class="category-pill shadow-sm" onclick="events.filterByCategory(${cat.id})">
+                ${cat.name}
+            </div>
+        `).join('');
+        nav.innerHTML = `<div class="category-pill active shadow-sm" onclick="events.fetchAll()">Tout</div>` + catsHtml;
+    },
 
-// 6. نظام الـ Auth (Login/UI)
-function updateAuthUI() {
-    const authSection = document.getElementById('auth-section');
-    if (state.token && state.user) {
-        authSection.innerHTML = `
-            <span class="nav-link text-white me-3">Bonjour, ${state.user.name} (${state.user.role})</span>
-            <button onclick="handleLogout()" class="btn btn-outline-danger btn-sm">Déconnexion</button>
-        `;
-    } else {
-        authSection.innerHTML = `
-            <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
-            <button class="btn btn-primary btn-sm ms-2">Inscription</button>
-        `;
-    }
-}
+    updateAuthUI() {
+        const authSection = document.getElementById('auth-section');
+        const fab = document.getElementById('add-event-fab');
+        if (!authSection) return;
 
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+        const user = state.user;
 
-    try {
-        const response = await fetch(`${API_URL}/auth/login`, { // [cite: 8]
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ email, password })
-        });
-        const result = await response.json();
+        if (state.token && user) {
+            // حماية ضد الأخطاء: إذا لم يوجد دور نضع 'USER'
+            const roleDisplay = (user.role || 'user').toUpperCase();
+            
+            if (user.role !== 'user') fab?.classList.remove('d-none');
 
-        if (result.success) {
-            localStorage.setItem('user_token', result.data.token);
-            localStorage.setItem('user_data', JSON.stringify(result.data.user));
-            location.reload();
+            authSection.innerHTML = `
+                <div class="dropdown">
+                    <button class="btn btn-light dropdown-toggle rounded-pill shadow-sm border px-3" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-1 text-primary"></i> ${user.name}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
+                        <li><h6 class="dropdown-header text-dark">Rôle: ${roleDisplay}</h6></li>
+                        <li><a class="dropdown-item" href="dashboard.html"><i class="fas fa-chart-line me-2 text-primary"></i>Tableau de Bord</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="auth.logout()">
+                            <i class="fas fa-sign-out-alt me-2"></i>Déconnexion
+                        </a></li>
+                    </ul>
+                </div>`;
         } else {
-            alert("Identifiants incorrects");
+            fab?.classList.add('d-none');
+            authSection.innerHTML = `
+                <button class="btn btn-outline-light btn-sm me-2 rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
+                <button class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#registerModal">S'inscrire</button>`;
         }
-    } catch (error) { alert("Erreur serveur"); }
-}
+    },
 
-function handleLogout() {
-    localStorage.clear();
-    location.reload();
-}
+    showEventModal() { new bootstrap.Modal(document.getElementById('addEventModal')).show(); }
+};
 
-// 7. تشغيل عند التحميل
-document.addEventListener('DOMContentLoaded', () => {
-    fetchEvents();
-    fetchCategories();
-    updateAuthUI();
+// 4. نظام الحجز والدفع والتذاكر (Booking Flow)
+const bookingFlow = {
+    selectedEvent: null,
 
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    
-    document.getElementById('search-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const query = document.getElementById('search-input').value;
-        fetchEvents({ search: query }); // [cite: 12]
-    });
-});
-
-function bookingAction(eventId) {
-    if (!state.token) {
-        new bootstrap.Modal(document.getElementById('loginModal')).show();
-    } else {
-        alert("Redirection vers la page de réservation pour l'événement #" + eventId);
-    }
-    // دالة لملء قائمة الأصناف في الفورم
-async function populateCategorySelect() {
-    const select = document.getElementById('category-select');
-    if (!select) return;
-    
-    const response = await fetch(`${API_URL}/categories`);
-    const result = await response.json();
-    if (result.success) {
-        select.innerHTML = result.data.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('');
-    }
-}
-
-// دالة إرسال الحدث الجديد
-async function handleEventSubmit(e) {
-    e.preventDefault();
-    const formData = new FormData(e.target); // كنستعملو FormData حيت كاين رفع صورة
-
-    try {
-        const response = await fetch(`${API_URL}/events`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${state.token}`, //
-                'Accept': 'application/json'
-            },
-            body: formData // ما كنديروش JSON.stringify حيت FormData كيتكلف بكلشي
-        });
-
-        const result = await response.json();
-        if (result.success) {
-            alert("Succès ! Votre événement est en attente de validation.");
-            location.reload();
-        } else {
-            alert("Erreur: " + JSON.stringify(result.errors));
-        }
-    } catch (error) {
-        console.error("Submit error:", error);
-    }
-}
-
-// تحديث الـ Navbar لإظهار زر "Ajouter" للمنظمين
-function updateAuthUI() {
-    const authSection = document.getElementById('auth-section');
-    if (state.token && state.user) {
-        let actionBtn = '';
-        if (state.user.role === 'organizer' || state.user.role === 'admin') { //
-            actionBtn = `<button class="btn btn-warning btn-sm me-2" data-bs-toggle="modal" data-bs-target="#addEventModal">Créer Event</button>`;
+    async initiateBooking(eventId) {
+        if (!state.token) {
+            new bootstrap.Modal(document.getElementById('loginModal')).show();
+            return;
         }
         
-        authSection.innerHTML = `
-            ${actionBtn}
-            <span class="text-white me-3 d-none d-md-inline">👤 ${state.user.name}</span>
-            <button onclick="handleLogout()" class="btn btn-outline-danger btn-sm">Déconnexion</button>
-        `;
-    } else {
-        authSection.innerHTML = `<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion / Inscription</button>`;
-    }
-}
+        const res = await api.request(`/events/${eventId}`);
+        if (res.success) {
+            this.selectedEvent = res.data;
+            const price = parseFloat(this.selectedEvent.price);
 
-// إضافة المستمعين للأحداث (Event Listeners)
-document.addEventListener('DOMContentLoaded', () => {
-    // ... الكود القديم
-    populateCategorySelect();
-    const eventForm = document.getElementById('event-form');
-    if (eventForm) eventForm.addEventListener('submit', handleEventSubmit);
-});
-async function handleBooking(eventId) {
-    if (!state.token) {
-        alert("Veuillez vous connecter pour réserver.");
-        new bootstrap.Modal(document.getElementById('loginModal')).show();
-        return;
-    }
-
-    const qty = prompt("Combien de places ?", "1");
-    if (!qty || isNaN(qty)) return;
-
-    try {
-        const response = await fetch(`${API_URL}/bookings`, {
-            method: 'POST',
-            headers: getHeaders(), //
-            body: JSON.stringify({
-                event_id: eventId,
-                quantity: parseInt(qty),
-                attendee_name: state.user.name,
-                attendee_email: state.user.email
-            })
-        });
-
-        const result = await response.json();
-        if (result.success) {
-            alert(`Succès ! Votre numéro de réservation est : ${result.booking_number}`);
-            location.reload();
-        } else {
-            alert(result.message || "Erreur lors de la réservation");
+            if (price === 0 || this.selectedEvent.is_free) {
+                if (confirm(`Confirmer votre réservation GRATUITE pour : ${this.selectedEvent.title} ?`)) {
+                    this.executeBooking();
+                }
+            } else {
+                document.getElementById('payment-event-info').innerHTML = `
+                    <strong>${this.selectedEvent.title}</strong><br>
+                    Total: <span class="text-primary">${this.selectedEvent.formatted_price}</span>
+                `;
+                new bootstrap.Modal(document.getElementById('paymentModal')).show();
+            }
         }
-    } catch (error) {
-        console.error("Booking error:", error);
+    },
+
+    async handlePayment(e) {
+        e.preventDefault();
+        const btn = document.getElementById('pay-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verification...';
+        setTimeout(() => this.executeBooking(), 1500);
+    },
+
+    async executeBooking() {
+        const data = {
+            event_id: this.selectedEvent.id,
+            quantity: 1,
+            attendee_name: state.user.name,
+            attendee_email: state.user.email
+        };
+
+        const res = await api.request('/bookings', 'POST', data);
+        if (res.success) {
+            const payModal = document.getElementById('paymentModal');
+            const instance = bootstrap.Modal.getInstance(payModal);
+            if(instance) instance.hide();
+            this.showTicket(res.booking_number);
+        } else {
+            alert(res.message || "Erreur lors de la réservation.");
+        }
+    },
+
+    async showTicket(bookingNumber) {
+        const res = await api.request(`/bookings/ticket/${bookingNumber}`);
+        if (res.success) {
+            const { booking, qr_code } = res.data;
+            document.getElementById('ticket-event-title').innerText = booking.event.title;
+            document.getElementById('ticket-qrcode').innerHTML = qr_code; 
+            document.getElementById('ticket-number').innerText = booking.booking_number;
+            document.getElementById('ticket-user').innerText = booking.attendee_name;
+            document.getElementById('ticket-date').innerText = new Date(booking.event.start_date).toLocaleDateString();
+            new bootstrap.Modal(document.getElementById('ticketModal')).show();
+        }
+    },
+
+    downloadPDF() {
+        const element = document.getElementById('ticket-to-print');
+        const bookingNo = document.getElementById('ticket-number').innerText;
+        const opt = {
+            margin: 10,
+            filename: `Ticket-${bookingNo}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
     }
-}
-}
+};
+
+// 5. موديول المصادقة (Auth Logic)
+const auth = {
+    async login(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const res = await api.request('/auth/login', 'POST', { email, password });
+        if (res.success) {
+            localStorage.setItem('user_token', res.data.token);
+            localStorage.setItem('user_data', JSON.stringify(res.data.user));
+            window.location.reload();
+        } else alert("Identifiants incorrects.");
+    },
+
+    async register(e) {
+        e.preventDefault();
+        const data = {
+            name: document.getElementById('register-name').value,
+            email: document.getElementById('register-email').value,
+            password: document.getElementById('register-password').value,
+            password_confirmation: document.getElementById('register-password-confirm').value
+        };
+        if (data.password !== data.password_confirmation) { alert("Mots de passe non identiques."); return; }
+
+        const res = await api.request('/auth/register', 'POST', data);
+        if (res.success) {
+            localStorage.setItem('user_token', res.data.token);
+            localStorage.setItem('user_data', JSON.stringify(res.data.user));
+            window.location.reload();
+        } else alert("Erreur d'inscription.");
+    },
+
+    logout() {
+        localStorage.clear();
+        window.location.reload();
+    }
+};
+
+// 6. موديول الأحداث (Events)
+const events = {
+    async fetchAll() {
+        const res = await api.request('/events');
+        if (res.success) ui.renderEvents(res.data);
+    },
+    async filterByCategory(id) {
+        const res = await api.request(`/events?category_id=${id}`);
+        if (res.success) ui.renderEvents(res.data);
+    },
+    async search(query) {
+        const res = await api.request(`/events?search=${query}`);
+        if (res.success) ui.renderEvents(res.data);
+    },
+    async create(e) {
+        e.preventDefault();
+        const res = await api.request('/events', 'POST', new FormData(e.target), true);
+        if (res.success) {
+            alert("Publié !");
+            window.location.reload();
+        }
+    }
+};
+
+// 7. التهيئة عند التحميل
+document.addEventListener('DOMContentLoaded', async () => {
+    ui.updateAuthUI();
+    events.fetchAll();
+    
+    const catRes = await api.request('/categories');
+    if (catRes.success) {
+        ui.renderCategories(catRes.data);
+        const select = document.getElementById('category-select');
+        if (select) select.innerHTML = catRes.data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    document.getElementById('login-form')?.addEventListener('submit', auth.login);
+    document.getElementById('register-form')?.addEventListener('submit', auth.register);
+    document.getElementById('payment-form')?.addEventListener('submit', (e) => bookingFlow.handlePayment(e));
+    document.getElementById('event-form')?.addEventListener('submit', events.create);
+    document.getElementById('search-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        events.search(document.getElementById('search-input').value);
+    });
+});
