@@ -1,88 +1,115 @@
 /**
- * EventHub Fès - Logiciel de gestion d'événements
- * Version: 4.0.0 (Final Stable Release)
+ * EventHub Fès - PFE ULTIMATE
+ * Correction: الأزرار والوظائف العالمية
  */
 
 const API_URL = "http://127.0.0.1:8000/api";
 
-// 1. إدارة الحالة (State Management)
-const state = {
+// 1. إدارة الحالة (State)
+window.state = {
     get token() { return localStorage.getItem('user_token'); },
     get user() { 
         const data = localStorage.getItem('user_data');
         try { return data ? JSON.parse(data) : null; } catch(e) { return null; }
     },
-    events: [],
-    categories: []
+    leafletMap: null,
+    currentEventId: null
 };
 
-// 2. مساعدات الـ API (API Helpers)
-const api = {
+// 2. مساعد الـ API
+window.api = {
     headers(isFormData = false) {
         const h = { 'Accept': 'application/json' };
         if (!isFormData) h['Content-Type'] = 'application/json';
         if (state.token) h['Authorization'] = `Bearer ${state.token}`;
         return h;
     },
-
     async request(endpoint, method = 'GET', data = null, isFormData = false) {
         const options = { method, headers: this.headers(isFormData) };
         if (data) options.body = isFormData ? data : JSON.stringify(data);
-
+        
         try {
             const response = await fetch(`${API_URL}${endpoint}`, options);
-            
-            // التعامل مع الجلسة المنتهية
             if (response.status === 401) {
-                if (state.token) {
-                    localStorage.clear();
-                    alert("Votre session a expiré. Veuillez vous reconnecter.");
-                    window.location.reload();
-                }
-                return { success: false, message: "Non authentifié" };
+                localStorage.clear();
+                return { success: false, message: "Session expirée" };
             }
-
             return await response.json();
         } catch (error) {
-            console.error("API Error:", error);
-            return { success: false, message: "Erreur de connexion au serveur." };
+            return { success: false, message: "Erreur serveur." };
         }
     }
 };
 
-// 3. التحكم في الواجهة (UI Controller)
-const ui = {
-    renderEvents(eventsList) {
-        const container = document.getElementById('events-container');
-        if (!container) return;
-
-        if (!eventsList || eventsList.length === 0) {
-            container.innerHTML = '<div class="col-12 text-center py-5"><h5 class="text-muted">Aucun événement trouvé à Fès.</h5></div>';
+// 3. نظام التقييمات
+window.reviewManager = {
+    selectedRating: 5,
+    initStars() {
+        const stars = document.querySelectorAll('.rating-stars i');
+        stars.forEach(star => {
+            star.onclick = (e) => {
+                this.selectedRating = e.target.dataset.val;
+                this.updateStarsUI(this.selectedRating);
+            };
+        });
+    },
+    updateStarsUI(val) {
+        document.querySelectorAll('.rating-stars i').forEach(star => {
+            star.className = star.dataset.val <= val ? 'fas fa-star text-warning' : 'far fa-star text-warning';
+        });
+    },
+    renderReviews(reviews) {
+        const list = document.getElementById('reviews-list');
+        if (!list) return;
+        if (!reviews || reviews.length === 0) {
+            list.innerHTML = '<p class="small text-muted">Aucun avis.</p>';
             return;
         }
+        list.innerHTML = reviews.map(r => `
+            <div class="mb-2 p-2 bg-light rounded shadow-sm">
+                <div class="d-flex justify-content-between">
+                    <strong style="font-size:12px">${r.user?.name || 'Anonyme'}</strong>
+                    <span class="text-warning" style="font-size:10px">${'★'.repeat(r.rating)}</span>
+                </div>
+                <p class="mb-0 small" style="font-size:11px">${r.comment || ''}</p>
+            </div>
+        `).join('');
+    },
+    async submit() {
+        const comment = document.getElementById('review-comment').value;
+        const res = await api.request('/reviews', 'POST', {
+            event_id: state.currentEventId,
+            rating: this.selectedRating,
+            comment: comment
+        });
+        if (res.success) {
+            Swal.fire('Merci !', 'Avis ajouté.', 'success');
+            document.getElementById('review-comment').value = "";
+            ui.showEventDetails(state.currentEventId);
+        } else {
+            Swal.fire('Info', res.message, 'info');
+        }
+    }
+};
 
-        container.innerHTML = eventsList.map(event => `
-            <div class="col-md-4 mb-4" data-aos="fade-up">
-                <div class="card h-100 event-card border-0 shadow-sm">
-                    <div class="position-relative">
-                        <img src="${event.image_url}" class="card-img-top" style="height:220px; object-fit:cover;">
-                        ${event.price == 0 ? '<span class="badge bg-success position-absolute top-0 end-0 m-3 shadow">GRATUIT</span>' : ''}
-                    </div>
+// 4. التحكم في الواجهة
+window.ui = {
+    renderEvents(list) {
+        const container = document.getElementById('events-container');
+        if (!container) return;
+        container.innerHTML = list.map(e => `
+            <div class="col-md-4 mb-4">
+                <div class="card event-card h-100 shadow-sm border-0">
+                    <img src="${e.image_url}" class="card-img-top" style="height:200px; object-fit:cover;">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge bg-primary rounded-pill px-3">${event.category?.name || 'Général'}</span>
-                            <small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${event.city}</small>
-                        </div>
-                        <h5 class="card-title fw-bold text-truncate">${event.title}</h5>
-                        <p class="card-text text-muted small text-truncate-2">${event.description.substring(0, 100)}...</p>
+                        <span class="badge bg-primary rounded-pill mb-2">${e.category?.name || 'Culture'}</span>
+                        <h6 class="fw-bold text-truncate">${e.title}</h6>
                         <div class="d-flex justify-content-between align-items-center mt-3">
+                            <span class="fw-bold text-primary small">${e.formatted_price}</span>
                             <div>
-                                <span class="d-block fw-bold text-primary fs-5">${event.formatted_price}</span>
-                                <small class="text-muted" style="font-size: 11px;">${event.available_spots || 0} places restantes</small>
+                                <button onclick="ui.showEventDetails(${e.id})" class="btn btn-outline-primary btn-sm rounded-pill px-3">Détails</button>
+                                <button onclick="bookingFlow.initiateBooking(${e.id})" class="btn btn-primary btn-sm rounded-pill px-3">Réserver</button>
                             </div>
-                            <button onclick="bookingFlow.initiateBooking(${event.id})" class="btn btn-primary rounded-pill px-4 btn-sm fw-bold shadow-sm">
-                                ${event.price == 0 ? 'Réserver' : 'Acheter'}
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -90,152 +117,126 @@ const ui = {
         `).join('');
     },
 
-    renderCategories(categories) {
-        const nav = document.getElementById('categories-nav');
-        if (!nav) return;
-        const catsHtml = categories.map(cat => `
-            <div class="category-pill shadow-sm" onclick="events.filterByCategory(${cat.id})">
-                ${cat.name}
-            </div>
-        `).join('');
-        nav.innerHTML = `<div class="category-pill active shadow-sm" onclick="events.fetchAll()">Tout</div>` + catsHtml;
+    async showEventDetails(eventId) {
+        state.currentEventId = eventId;
+        const res = await api.request(`/events/${eventId}`);
+        if (res.success) {
+            const event = res.data;
+            document.getElementById('detail-title').innerText = event.title;
+            document.getElementById('detail-image').src = event.image_url;
+            document.getElementById('detail-description').innerText = event.description;
+            document.getElementById('detail-venue').innerText = event.venue_address;
+            document.getElementById('detail-price').innerText = event.formatted_price;
+
+            reviewManager.renderReviews(event.reviews);
+
+            document.getElementById('detail-reserve-btn').onclick = () => {
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('eventDetailsModal')).hide();
+                bookingFlow.initiateBooking(event.id);
+            };
+
+            const modal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
+            modal.show();
+
+            setTimeout(() => this.initMap(event.latitude || 34.03, event.longitude || -5.00, event.title), 500);
+        }
+    },
+
+    initMap(lat, lng, title) {
+        if (state.leafletMap) state.leafletMap.remove();
+        state.leafletMap = L.map('map').setView([lat, lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(state.leafletMap);
+        L.marker([lat, lng]).addTo(state.leafletMap).bindPopup(title).openPopup();
+        setTimeout(() => state.leafletMap.invalidateSize(), 200);
     },
 
     updateAuthUI() {
-        const authSection = document.getElementById('auth-section');
+        const authSec = document.getElementById('auth-section');
         const fab = document.getElementById('add-event-fab');
-        if (!authSection) return;
-
-        const user = state.user;
-
-        if (state.token && user) {
-            // حماية ضد الأخطاء: إذا لم يوجد دور نضع 'USER'
-            const roleDisplay = (user.role || 'user').toUpperCase();
-            
-            if (user.role !== 'user') fab?.classList.remove('d-none');
-
-            authSection.innerHTML = `
+        if (state.token && state.user) {
+            if (state.user.role !== 'user') fab?.classList.remove('d-none');
+            authSec.innerHTML = `
                 <div class="dropdown">
-                    <button class="btn btn-light dropdown-toggle rounded-pill shadow-sm border px-3" data-bs-toggle="dropdown">
-                        <i class="fas fa-user-circle me-1 text-primary"></i> ${user.name}
+                    <button class="btn btn-light dropdown-toggle rounded-pill btn-sm px-3" data-bs-toggle="dropdown">
+                        Hi, ${state.user.name}
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
-                        <li><h6 class="dropdown-header text-dark">Rôle: ${roleDisplay}</h6></li>
-                        <li><a class="dropdown-item" href="dashboard.html"><i class="fas fa-chart-line me-2 text-primary"></i>Tableau de Bord</a></li>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li><a class="dropdown-item" href="dashboard.html">Dashboard</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="auth.logout()">
-                            <i class="fas fa-sign-out-alt me-2"></i>Déconnexion
-                        </a></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="auth.logout()">Déconnexion</a></li>
                     </ul>
                 </div>`;
         } else {
             fab?.classList.add('d-none');
-            authSection.innerHTML = `
-                <button class="btn btn-outline-light btn-sm me-2 rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
-                <button class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#registerModal">S'inscrire</button>`;
+            authSec.innerHTML = `
+                <button class="btn btn-outline-light btn-sm me-2 rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
+                <button class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#registerModal">S'inscrire</button>`;
         }
     },
 
     showEventModal() { new bootstrap.Modal(document.getElementById('addEventModal')).show(); }
 };
 
-// 4. نظام الحجز والدفع والتذاكر (Booking Flow)
-const bookingFlow = {
+// 5. نظام الحجز
+window.bookingFlow = {
     selectedEvent: null,
-
-    async initiateBooking(eventId) {
-        if (!state.token) {
-            new bootstrap.Modal(document.getElementById('loginModal')).show();
-            return;
-        }
-        
-        const res = await api.request(`/events/${eventId}`);
+    async initiateBooking(id) {
+        if (!state.token) { new bootstrap.Modal(document.getElementById('loginModal')).show(); return; }
+        const res = await api.request(`/events/${id}`);
         if (res.success) {
             this.selectedEvent = res.data;
-            const price = parseFloat(this.selectedEvent.price);
-
-            if (price === 0 || this.selectedEvent.is_free) {
-                if (confirm(`Confirmer votre réservation GRATUITE pour : ${this.selectedEvent.title} ?`)) {
-                    this.executeBooking();
-                }
+            if (parseFloat(this.selectedEvent.price) === 0) {
+                if (confirm("Réserver cette place GRATUITE ?")) this.executeBooking();
             } else {
-                document.getElementById('payment-event-info').innerHTML = `
-                    <strong>${this.selectedEvent.title}</strong><br>
-                    Total: <span class="text-primary">${this.selectedEvent.formatted_price}</span>
-                `;
+                document.getElementById('payment-event-info').innerText = this.selectedEvent.title;
                 new bootstrap.Modal(document.getElementById('paymentModal')).show();
             }
         }
     },
-
-    async handlePayment(e) {
-        e.preventDefault();
-        const btn = document.getElementById('pay-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verification...';
-        setTimeout(() => this.executeBooking(), 1500);
-    },
-
     async executeBooking() {
-        const data = {
+        const res = await api.request('/bookings', 'POST', {
             event_id: this.selectedEvent.id,
             quantity: 1,
             attendee_name: state.user.name,
             attendee_email: state.user.email
-        };
-
-        const res = await api.request('/bookings', 'POST', data);
+        });
         if (res.success) {
-            const payModal = document.getElementById('paymentModal');
-            const instance = bootstrap.Modal.getInstance(payModal);
-            if(instance) instance.hide();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).hide();
             this.showTicket(res.booking_number);
-        } else {
-            alert(res.message || "Erreur lors de la réservation.");
         }
     },
-
-    async showTicket(bookingNumber) {
-        const res = await api.request(`/bookings/ticket/${bookingNumber}`);
+    async showTicket(num) {
+        const res = await api.request(`/bookings/ticket/${num}`);
         if (res.success) {
             const { booking, qr_code } = res.data;
             document.getElementById('ticket-event-title').innerText = booking.event.title;
-            document.getElementById('ticket-qrcode').innerHTML = qr_code; 
+            document.getElementById('ticket-qrcode').innerHTML = qr_code;
             document.getElementById('ticket-number').innerText = booking.booking_number;
             document.getElementById('ticket-user').innerText = booking.attendee_name;
             document.getElementById('ticket-date').innerText = new Date(booking.event.start_date).toLocaleDateString();
             new bootstrap.Modal(document.getElementById('ticketModal')).show();
         }
     },
-
     downloadPDF() {
-        const element = document.getElementById('ticket-to-print');
-        const bookingNo = document.getElementById('ticket-number').innerText;
-        const opt = {
-            margin: 10,
-            filename: `Ticket-${bookingNo}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().set(opt).from(element).save();
+        const el = document.getElementById('ticket-to-print');
+        html2pdf().set({ margin: 10, filename: 'ticket.pdf', html2canvas: { scale: 2, useCORS: true, scrollY:0 } }).from(el).save();
     }
 };
 
-// 5. موديول المصادقة (Auth Logic)
-const auth = {
+// 6. المصادقة والأحداث
+window.auth = {
     async login(e) {
         e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-        const res = await api.request('/auth/login', 'POST', { email, password });
+        const res = await api.request('/auth/login', 'POST', { 
+            email: document.getElementById('login-email').value, 
+            password: document.getElementById('login-password').value 
+        });
         if (res.success) {
             localStorage.setItem('user_token', res.data.token);
             localStorage.setItem('user_data', JSON.stringify(res.data.user));
-            window.location.reload();
+            location.reload();
         } else alert("Identifiants incorrects.");
     },
-
     async register(e) {
         e.preventDefault();
         const data = {
@@ -244,24 +245,17 @@ const auth = {
             password: document.getElementById('register-password').value,
             password_confirmation: document.getElementById('register-password-confirm').value
         };
-        if (data.password !== data.password_confirmation) { alert("Mots de passe non identiques."); return; }
-
         const res = await api.request('/auth/register', 'POST', data);
         if (res.success) {
             localStorage.setItem('user_token', res.data.token);
             localStorage.setItem('user_data', JSON.stringify(res.data.user));
-            window.location.reload();
-        } else alert("Erreur d'inscription.");
+            location.reload();
+        }
     },
-
-    logout() {
-        localStorage.clear();
-        window.location.reload();
-    }
+    logout() { localStorage.clear(); location.reload(); }
 };
 
-// 6. موديول الأحداث (Events)
-const events = {
+window.events = {
     async fetchAll() {
         const res = await api.request('/events');
         if (res.success) ui.renderEvents(res.data);
@@ -273,33 +267,27 @@ const events = {
     async search(query) {
         const res = await api.request(`/events?search=${query}`);
         if (res.success) ui.renderEvents(res.data);
-    },
-    async create(e) {
-        e.preventDefault();
-        const res = await api.request('/events', 'POST', new FormData(e.target), true);
-        if (res.success) {
-            alert("Publié !");
-            window.location.reload();
-        }
     }
 };
 
-// 7. التهيئة عند التحميل
-document.addEventListener('DOMContentLoaded', async () => {
+// 7. البداية
+document.addEventListener('DOMContentLoaded', () => {
     ui.updateAuthUI();
+    reviewManager.initStars();
     events.fetchAll();
     
-    const catRes = await api.request('/categories');
-    if (catRes.success) {
-        ui.renderCategories(catRes.data);
-        const select = document.getElementById('category-select');
-        if (select) select.innerHTML = catRes.data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    }
+    // تحميل التصنيفات
+    api.request('/categories').then(res => {
+        if (res.success) {
+            const nav = document.getElementById('categories-nav');
+            if(nav) nav.innerHTML = `<div class="category-pill active" onclick="events.fetchAll()">Tout</div>` + 
+                res.data.map(c => `<div class="category-pill" onclick="events.filterByCategory(${c.id})">${c.name}</div>`).join('');
+        }
+    });
 
     document.getElementById('login-form')?.addEventListener('submit', auth.login);
     document.getElementById('register-form')?.addEventListener('submit', auth.register);
-    document.getElementById('payment-form')?.addEventListener('submit', (e) => bookingFlow.handlePayment(e));
-    document.getElementById('event-form')?.addEventListener('submit', events.create);
+    document.getElementById('payment-form')?.addEventListener('submit', (e) => { e.preventDefault(); bookingFlow.executeBooking(); });
     document.getElementById('search-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
         events.search(document.getElementById('search-input').value);

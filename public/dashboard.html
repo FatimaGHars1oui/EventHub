@@ -3,87 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | EventHub Fès</title>
+    <title>Elite Dashboard | EventHub Fès</title>
+    
+    <!-- CSS Dependencies -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- JS Dependencies (Charts, PDF, QR Scanner, Alerts) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-        :root { --sidebar-width: 250px; --primary: #0d6efd; }
-        body { background: #f4f7f6; font-family: 'Poppins', sans-serif; }
-        #sidebar { width: var(--sidebar-width); height: 100vh; position: fixed; background: #212529; color: white; transition: 0.3s; }
-        #content { margin-left: var(--sidebar-width); padding: 30px; }
-        .nav-link { color: rgba(255,255,255,0.7); padding: 12px 20px; border-radius: 0; }
-        .nav-link:hover, .nav-link.active { background: var(--primary); color: white; }
-        .stat-card { border: none; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        :root { 
+            --primary: #4361ee; --sidebar-bg: #0f172a; 
+            --content-bg: #f8fafc; --text-muted: #64748b;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--content-bg); color: #1e293b; overflow-x: hidden; }
+        
+        /* Sidebar Layout */
+        #sidebar { 
+            width: 280px; height: 100vh; position: fixed; 
+            background: var(--sidebar-bg); color: white; transition: 0.3s; z-index: 1000;
+        }
+        #main-wrapper { margin-left: 280px; padding: 40px; transition: 0.3s; min-height: 100vh; }
+        
+        .sidebar-header { padding: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .nav-custom .nav-link { 
+            color: #94a3b8; padding: 12px 25px; margin: 5px 15px;
+            border-radius: 12px; transition: 0.3s; display: flex; align-items: center;
+        }
+        .nav-custom .nav-link:hover, .nav-custom .nav-link.active { 
+            background: rgba(255,255,255,0.1); color: white; 
+        }
+        .nav-custom .nav-link.active { background: var(--primary); box-shadow: 0 10px 15px -3px rgba(67, 97, 238, 0.3); }
+        .nav-custom i { width: 28px; font-size: 1.1rem; }
+
+        /* KPI Cards */
+        .stat-card { 
+            border: none; border-radius: 24px; padding: 25px; 
+            background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            border: 1px solid #f1f5f9; transition: 0.3s;
+        }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .icon-shape {
+            width: 52px; height: 52px; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center; font-size: 22px;
+        }
+
+        /* Charts & Tables */
+        .glass-card { background: white; border-radius: 24px; padding: 30px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; }
+        .table-custom thead th { background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: var(--text-muted); padding: 15px; border: none; }
+        .table-custom tbody td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+
+        /* Scanner Feed */
+        #reader { border-radius: 20px; overflow: hidden; border: none !important; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        
+        /* PDF Ticket Template (Hidden) */
+        #ticket-to-print { background: white !important; color: black !important; width: 450px; margin: auto; border-radius: 20px; overflow: hidden; border: 2px dashed #ddd; }
+
+        @media (max-width: 992px) {
+            #sidebar { margin-left: -280px; }
+            #main-wrapper { margin-left: 0; padding: 20px; }
+            body.show-sidebar #sidebar { margin-left: 0; }
+        }
     </style>
 </head>
-<body>
+<body class="show-sidebar">
 
-    <!-- Sidebar -->
-    <div id="sidebar">
-        <div class="p-4 text-center border-bottom border-secondary">
-            <h4 class="fw-bold m-0">Event<span class="text-primary">Hub</span></h4>
-            <small id="user-role" class="badge bg-primary mt-2"></small>
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar">
+        <div class="sidebar-header text-center">
+            <h3 class="fw-bold m-0 text-white">Event<span class="text-primary">Hub</span></h3>
+            <div id="user-role-badge" class="badge bg-primary bg-opacity-10 text-primary mt-2 px-3 py-2 text-uppercase" style="font-size: 9px; letter-spacing: 1px;">Role</div>
         </div>
-        <nav class="nav flex-column mt-3">
-            <a class="nav-link active" href="#" onclick="dash.showTab('overview')"><i class="fas fa-home me-2"></i>Vue d'ensemble</a>
-            <a class="nav-link" id="link-events" href="#" onclick="dash.showTab('events')"><i class="fas fa-calendar-alt me-2"></i>Mes Événements</a>
-            <a class="nav-link" href="#" onclick="dash.showTab('bookings')"><i class="fas fa-ticket-alt me-2"></i>Mes Réservations</a>
-            <hr class="mx-3 border-secondary">
-            <a class="nav-link text-danger" href="index.html"><i class="fas fa-arrow-left me-2"></i>Retour au site</a>
-        </nav>
-    </div>
+        <div class="nav flex-column nav-custom mt-4">
+            <a class="nav-link active" href="#" onclick="dash.showTab('overview')"><i class="fas fa-th-large"></i> Vue d'ensemble</a>
+            <a class="nav-link" id="link-events" href="#" onclick="dash.showTab('events')"><i class="fas fa-calendar-alt"></i> Mes Événements</a>
+            <a class="nav-link" id="link-bookings" href="#" onclick="dash.showTab('bookings')"><i class="fas fa-ticket-alt"></i> Mes Réservations</a>
+            <a class="nav-link" id="link-scanner" href="#" onclick="dash.showTab('scanner')"><i class="fas fa-camera"></i> Scanner Tickets</a>
+            <hr class="mx-4 opacity-5 border-white">
+            <a class="nav-link text-warning" href="index.html"><i class="fas fa-external-link-alt"></i> Retour au site</a>
+            <a class="nav-link text-danger" href="#" onclick="auth.logout()"><i class="fas fa-power-off"></i> Déconnexion</a>
+        </div>
+    </aside>
 
-    <!-- Main Content -->
-    <div id="content">
-        <header class="d-flex justify-content-between align-items-center mb-4">
-            <h2 id="tab-title" class="fw-bold">Vue d'ensemble</h2>
-            <div class="dropdown">
-                <button class="btn btn-white shadow-sm dropdown-toggle rounded-pill px-3" data-bs-toggle="dropdown">
-                    <span id="user-name"></span>
-                </button>
-                <ul class="dropdown-menu border-0 shadow">
-                    <li><a class="dropdown-item" href="#" onclick="auth.logout()">Déconnexion</a></li>
-                </ul>
+    <!-- Main Content Area -->
+    <main id="main-wrapper">
+        <header class="d-flex justify-content-between align-items-center mb-5">
+            <button class="btn btn-white shadow-sm rounded-3 d-lg-none me-3" onclick="document.body.classList.toggle('show-sidebar')">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div>
+                <h2 id="tab-title" class="fw-bold m-0">Tableau de Bord</h2>
+                <p class="text-muted small m-0">Suivi en temps réel de vos activités.</p>
+            </div>
+            <div class="d-flex align-items-center bg-white p-2 pe-3 rounded-pill shadow-sm border">
+                <img id="user-avatar" src="" class="rounded-circle me-2" width="38" height="38">
+                <span id="user-name" class="fw-bold small text-dark">...</span>
             </div>
         </header>
 
-        <!-- Stats Section (Overview) -->
-        <div id="tab-overview" class="row g-4 dash-tab">
-            <div class="col-md-4">
-                <div class="card stat-card p-4 bg-white text-center">
-                    <h6 class="text-muted">Total Réservations</h6>
-                    <h2 id="stat-bookings" class="fw-bold">0</h2>
+        <!-- TAB: OVERVIEW -->
+        <div id="tab-overview" class="dash-tab">
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="stat-card d-flex align-items-center">
+                        <div class="icon-shape bg-primary bg-opacity-10 text-primary me-3"><i class="fas fa-ticket-alt"></i></div>
+                        <div><p class="text-muted mb-0 small">Réservations</p><h3 id="stat-count-1" class="fw-bold m-0">0</h3></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card d-flex align-items-center">
+                        <div class="icon-shape bg-success bg-opacity-10 text-success me-3"><i class="fas fa-wallet"></i></div>
+                        <div><p class="text-muted mb-0 small">Chiffre d'Affaires</p><h3 id="stat-count-2" class="fw-bold m-0">0 MAD</h3></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card d-flex align-items-center">
+                        <div class="icon-shape bg-warning bg-opacity-10 text-warning me-3"><i class="fas fa-star"></i></div>
+                        <div><p class="text-muted mb-0 small">Statut Compte</p><h3 id="stat-count-3" class="fw-bold m-0">Actif</h3></div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card stat-card p-4 bg-primary text-white text-center">
-                    <h6>Dépenses/Revenus</h6>
-                    <h2 id="stat-money" class="fw-bold">0 MAD</h2>
+
+            <!-- Admin/Organizer Charts -->
+            <div id="admin-charts" class="row g-4">
+                <div class="col-lg-8">
+                    <div class="glass-card h-100">
+                        <h5 class="fw-bold mb-4">Événements les plus populaires</h5>
+                        <canvas id="barChart" height="300"></canvas>
+                    </div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card stat-card p-4 bg-white text-center">
-                    <h6 class="text-muted">Événements Actifs</h6>
-                    <h2 id="stat-events" class="fw-bold">0</h2>
+                <div class="col-lg-4">
+                    <div class="glass-card h-100">
+                        <h5 class="fw-bold mb-4 text-center">Par Catégorie</h5>
+                        <canvas id="pieChart" height="300"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Data Table Section -->
-        <div id="tab-data" class="mt-5 dash-tab">
-            <div class="table-container">
-                <table class="table table-hover align-middle">
-                    <thead id="table-head" class="table-light"></thead>
-                    <tbody id="table-body"></tbody>
-                </table>
+        <!-- TAB: DATA TABLE (Bookings/Events) -->
+        <div id="tab-data" class="dash-tab mt-4" style="display: none;">
+            <div class="glass-card p-0 overflow-hidden">
+                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 id="table-title" class="fw-bold m-0 text-primary">Liste des données</h5>
+                    <button class="btn btn-primary btn-sm rounded-pill px-3" onclick="dash.loadOverview()">Actualiser <i class="fas fa-sync-alt ms-1"></i></button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-custom m-0">
+                        <thead id="table-head"></thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: SCANNER -->
+        <div id="tab-scanner" class="dash-tab mt-4" style="display: none;">
+            <div class="glass-card text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-qrcode text-primary display-4 mb-3"></i>
+                    <h4 class="fw-bold">Contrôle d'accès</h4>
+                    <p class="text-muted">Scannez le QR Code présent sur le billet du visiteur.</p>
+                </div>
+                <!-- Camera Feed -->
+                <div id="reader" style="max-width: 500px; margin: auto;"></div>
+                <div class="mt-4">
+                    <button class="btn btn-outline-danger rounded-pill px-4" onclick="dash.stopScanner()">
+                        <i class="fas fa-stop me-2"></i> Arrêter le scanner
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL: View Ticket -->
+    <div class="modal fade" id="ticketModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 bg-transparent">
+                <div class="modal-body p-0">
+                    <!-- Ticket UI -->
+                    <div id="ticket-to-print">
+                        <div class="bg-primary text-white p-4 text-center">
+                            <h4 class="m-0 fw-bold">EVENTHUB TICKET</h4>
+                            <p id="ticket-event-title" class="m-0 small opacity-75"></p>
+                        </div>
+                        <div class="p-4 text-center bg-white">
+                            <div id="ticket-qrcode" class="mb-4 d-inline-block p-3 border rounded shadow-sm"></div>
+                            <h5 id="ticket-number" class="fw-bold text-primary mb-4"></h5>
+                            <hr>
+                            <div class="row text-start mt-3 px-2">
+                                <div class="col-6"><small class="text-muted d-block">Nom du Participant</small><span id="ticket-user" class="fw-bold"></span></div>
+                                <div class="col-6 text-end"><small class="text-muted d-block">Date Event</small><span id="ticket-date" class="fw-bold"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Actions -->
+                    <div class="text-center mt-4">
+                        <button onclick="bookingFlow.downloadPDF()" class="btn btn-warning rounded-pill px-4 fw-bold shadow me-2">
+                            <i class="fas fa-file-pdf me-2"></i>Télécharger PDF
+                        </button>
+                        <button class="btn btn-light rounded-pill px-4 shadow" data-bs-dismiss="modal">Fermer</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Scripts Logic -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/app.js"></script> <!-- نستخدم نفس ملف الـ Logic الأساسي -->
-    <script src="js/dashboard.js"></script> <!-- ملف جديد لمنطق اللوحة -->
+    <script src="js/app.js"></script>
+    <script src="js/dashboard.js"></script>
 </body>
 </html>

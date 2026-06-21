@@ -232,6 +232,12 @@ class Event extends Model
         $this->decrement('current_attendees', $quantity);
        
     }
+    // داخل ملف app/Models/Event.php
+
+public function reviews()
+{
+    return $this->hasMany(Review::class);
+}
         
        
 }
