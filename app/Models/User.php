@@ -1,22 +1,21 @@
 <?php
 
 namespace App\Models;
+
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use  HasApiTokens,HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * الحقول القابلة للتعبئة (Mass Assignable).
+     * أضفنا 'role' و 'phone' و 'bio' و 'avatar' لضمان عمل الـ API بشكل صحيح.
      */
     protected $fillable = [
         'name',
@@ -25,14 +24,12 @@ class User extends Authenticatable
         'phone',
         'bio',
         'avatar',
-        'role',
-        'email_verified_at',
+        'role',      // مهم جداً للتحكم في الرتب
+        'is_active',  // حالة الحساب
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
+     * الحقول التي يجب إخفاؤها عند تحويل الموديل إلى JSON (للأمان).
      */
     protected $hidden = [
         'password',
@@ -40,29 +37,64 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * تحويل أنواع البيانات (Casting).
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
-    // === RELATIONS ===
+
+    // =========================================================================
+    // العلاقات (RELATIONS)
+    // =========================================================================
+
     /**
-     * Evenement réservé par l'utilisateur (one to many)
+     * علاقة المستخدم بالحجوزات (One to Many).
+     * المستخدم الواحد يمكنه إجراء عدة حجوزات.
      */
-    public function organizedEvents()
+    public function bookings(): HasMany
     {
-        return $this->hasMany(Event::class, 'organizer_id'); //Un utilisateur peut organiser plusieurs événements
+        return $this->hasMany(Booking::class, 'user_id');
     }
+
     /**
-     * Réservations effectuées par l'utilisateur (one to many)
+     * علاقة المنظم بالفعاليات التي أنشأها (One to Many).
+     * تُستخدم فقط إذا كانت رتبة المستخدم 'organizer' أو 'admin'.
      */
-    public function bookings(){
-        return $this->hasMany(Booking::class, 'user_id'); //Un utilisateur peut faire plusieurs réservations
+    public function organizedEvents(): HasMany
+    {
+        return $this->hasMany(Event::class, 'organizer_id');
+    }
+
+    /**
+     * علاقة المستخدم بالتقييمات (Reviews).
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    // =========================================================================
+    // وظائف مساعدة (Helper Functions)
+    // =========================================================================
+
+    /**
+     * فحص هل المستخدم مدير (Admin).
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * فحص هل المستخدم منظم (Organizer).
+     */
+    public function isOrganizer(): bool
+    {
+        return $this->role === 'organizer';
     }
 }

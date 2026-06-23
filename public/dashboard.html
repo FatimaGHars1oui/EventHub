@@ -1,231 +1,502 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord | EventHub Fès</title>
+    <title>Tableau de bord | EventHub Fès</title>
     
-    <!-- CSS & Fonts -->
+    <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- JS Dependencies -->
+    <!-- Fonts & Charts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
         :root { 
-            --primary: #4361ee; --sidebar-bg: #0f172a; 
-            --content-bg: #f8fafc; --text-muted: #64748b;
-        }
-        body { font-family: 'Inter', sans-serif; background-color: var(--content-bg); color: #1e293b; overflow-x: hidden; }
-        
-        /* Sidebar Layout */
-        #sidebar { 
-            width: 280px; height: 100vh; position: fixed; 
-            background: var(--sidebar-bg); color: white; transition: 0.3s; z-index: 1000;
-        }
-        #main-wrapper { margin-left: 280px; padding: 40px; transition: 0.3s; min-height: 100vh; }
-        
-        .sidebar-header { padding: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .nav-custom .nav-link { 
-            color: #94a3b8; padding: 12px 25px; margin: 4px 15px;
-            border-radius: 12px; transition: 0.3s; display: flex; align-items: center;
-        }
-        .nav-custom .nav-link:hover, .nav-custom .nav-link.active { 
-            background: rgba(255,255,255,0.1); color: white; 
-        }
-        .nav-custom .nav-link.active { background: var(--primary); box-shadow: 0 10px 15px -3px rgba(67, 97, 238, 0.3); }
-        .nav-custom i { width: 28px; font-size: 1.1rem; }
-
-        /* Role-Based Badge */
-        #user-role-badge { font-size: 9px; letter-spacing: 1px; padding: 6px 12px; }
-
-        /* KPI Cards */
-        .stat-card { 
-            border: none; border-radius: 24px; padding: 25px; 
-            background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
-            border: 1px solid #f1f5f9; transition: 0.3s;
-        }
-        .icon-shape {
-            width: 52px; height: 52px; border-radius: 16px;
-            display: flex; align-items: center; justify-content: center; font-size: 22px;
+            --primary: #6366f1;
+            --dark: #0f172a;
+            --sidebar-bg: #1a2332;
+            --light-bg: #f8fafc;
         }
 
-        /* Logic Visibility */
-        .admin-only, .organizer-only, .user-only { display: none; }
+        * { font-family: 'Cairo', sans-serif; }
 
-        /* Tables & Charts */
-        .glass-card { background: white; border-radius: 24px; padding: 30px; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-        .table-custom thead th { background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: var(--text-muted); padding: 15px; border: none; }
-        .table-custom tbody td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+        body {
+            background: var(--light-bg);
+            margin: 0;
+            padding: 0;
+        }
 
-        /* Sections */
-        .dash-section { display: none; animation: fadeIn 0.4s ease; }
-        .dash-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* ============ Sidebar ============ */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--sidebar-bg) 100%);
+            color: white;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 5px 0 20px rgba(0,0,0,0.1);
+        }
 
+        .sidebar-header {
+            padding: 30px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .sidebar-header h3 {
+            margin: 0;
+            font-weight: 900;
+            font-size: 1.5rem;
+        }
+
+        .sidebar-header span {
+            color: #f59e0b;
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+        }
+
+        .nav-link {
+            color: #cbd5e1;
+            padding: 12px 20px;
+            margin: 5px 10px;
+            border-radius: 12px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .nav-link:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: white;
+        }
+
+        .nav-link.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .nav-link i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* ============ Main Content ============ */
+        .main-content {
+            margin-left: 280px;
+            padding: 40px;
+            transition: 0.3s;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: var(--dark);
+            font-weight: 900;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        /* ============ Stats Cards ============ */
+        .stat-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--dark);
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        /* ============ Sections ============ */
+        .dashboard-section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .dashboard-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ============ Table ============ */
+        .table-responsive {
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        table {
+            background: white;
+        }
+
+        table thead {
+            background: var(--light-bg);
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        table th {
+            color: #64748b;
+            font-weight: 700;
+            padding: 15px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        table td {
+            padding: 15px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #475569;
+        }
+
+        table tbody tr:hover {
+            background: var(--light-bg);
+        }
+
+        /* ============ Buttons ============ */
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 10px 25px;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+            color: white;
+        }
+
+        /* ============ Forms ============ */
+        .form-control,
+        .form-select {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 10px 15px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        /* ============ Responsive ============ */
         @media (max-width: 992px) {
-            #sidebar { margin-left: -280px; }
-            #main-wrapper { margin-left: 0; padding: 20px; }
-            body.show-sidebar #sidebar { margin-left: 0; }
+            .sidebar {
+                transform: translateX(-280px);
+                transition: 0.3s;
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
         }
     </style>
 </head>
-<body class="show-sidebar">
+<body>
 
-    <!-- SIDEBAR -->
-    <aside id="sidebar">
-        <div class="sidebar-header text-center">
-            <h3 class="fw-bold m-0 text-white">Event<span class="text-primary">Hub</span></h3>
-            <div id="user-role-badge" class="badge bg-primary bg-opacity-10 text-primary mt-2 text-uppercase">Role</div>
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h3>Event<span>Hub</span></h3>
+            <p class="text-muted mb-0 small" id="user-role" style="font-size: 0.8rem; margin-top: 8px;">Tableau de bord</p>
         </div>
-        <div class="nav flex-column nav-custom mt-4">
-            <a class="nav-link active" href="#" onclick="dashManager.showSection('overview')"><i class="fas fa-th-large"></i> Vue d'ensemble</a>
-            
-            <!-- Admin Sections -->
-            <a class="nav-link admin-only" id="nav-val" href="#" onclick="dashManager.showSection('validation')"><i class="fas fa-check-circle"></i> Validations</a>
-            <a class="nav-link admin-only" id="nav-users" href="#" onclick="dashManager.showSection('users')"><i class="fas fa-users"></i> Utilisateurs</a>
-            
-            <!-- Organizer/Admin Sections -->
-            <a class="nav-link admin-only organizer-only" id="link-events" href="#" onclick="dashManager.showSection('events')"><i class="fas fa-calendar-alt"></i> Mes Événements</a>
-            <a class="nav-link admin-only organizer-only" id="link-scanner" href="#" onclick="dashManager.showSection('scanner')"><i class="fas fa-camera"></i> Scanner QR</a>
-            
-            <!-- User Section -->
-            <a class="nav-link user-only" id="link-my-bookings" href="#" onclick="dashManager.showSection('bookings')"><i class="fas fa-ticket-alt"></i> Mes Réservations</a>
-            
-            <hr class="mx-4 opacity-10 border-white">
-            <a class="nav-link text-warning" href="index.html"><i class="fas fa-external-link-alt"></i> Retour au site</a>
-            <a class="nav-link text-danger" href="#" onclick="auth.logout()"><i class="fas fa-power-off"></i> Déconnexion</a>
-        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-link active" onclick="showSection('overview')">
+                <i class="fas fa-th-large"></i> Vue d'ensemble
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('bookings')">
+                <i class="fas fa-ticket-alt"></i> Mes réservations
+            </a>
+            <a href="#" class="nav-link organizer-only" onclick="showSection('my-events')">
+                <i class="fas fa-calendar-alt"></i> Mes événements
+            </a>
+            <a href="#" class="nav-link organizer-only" onclick="showSection('add-event')">
+                <i class="fas fa-plus-circle"></i> Ajouter un événement
+            </a>
+            <a href="#" class="nav-link admin-only" onclick="showSection('users')">
+                <i class="fas fa-users"></i> Utilisateurs
+            </a>
+            <a href="#" class="nav-link admin-only" onclick="showSection('statistics')">
+                <i class="fas fa-chart-line"></i> Statistiques
+            </a>
+            <hr class="opacity-25">
+            <a href="#" class="nav-link" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Se déconnecter
+            </a>
+        </nav>
     </aside>
 
-    <!-- MAIN CONTENT -->
-    <main id="main-wrapper">
-        <header class="d-flex justify-content-between align-items-center mb-5">
-            <button class="btn btn-white shadow-sm rounded-3 d-lg-none me-3" onclick="document.body.classList.toggle('show-sidebar')">
-                <i class="fas fa-bars"></i>
-            </button>
+    <!-- ============ MAIN CONTENT ============ -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header">
             <div>
-                <h2 id="section-title" class="fw-bold m-0">Dashboard</h2>
-                <p class="text-muted small m-0">Espace <span id="display-role">Utilisateur</span></p>
+                <h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1>
+                <p class="text-muted" id="welcome-msg">Bienvenue</p>
             </div>
-            <div class="d-flex align-items-center bg-white p-2 pe-3 rounded-pill shadow-sm border">
-                <img id="user-avatar" src="" class="rounded-circle me-2 border" width="38" height="38">
-                <span id="user-name" class="fw-bold small text-dark">Chargement...</span>
-            </div>
-        </header>
-
-        <!-- SECTION: OVERVIEW -->
-        <div id="section-overview" class="dash-section active">
-            <!-- KPI Row -->
-            <div class="row g-4 mb-5">
-                <div class="col-md-4">
-                    <div class="stat-card d-flex align-items-center">
-                        <div class="icon-shape bg-primary bg-opacity-10 text-primary me-3"><i class="fas fa-ticket-alt"></i></div>
-                        <div><p class="text-muted mb-0 small">Réservations</p><h3 id="stat-count-1" class="fw-bold m-0">0</h3></div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="stat-card d-flex align-items-center">
-                        <div class="icon-shape bg-success bg-opacity-10 text-success me-3"><i class="fas fa-wallet"></i></div>
-                        <div><p class="text-muted mb-0 small" id="stat-label-2">Dépenses</p><h3 id="stat-count-2" class="fw-bold m-0">0 MAD</h3></div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="stat-card d-flex align-items-center">
-                        <div class="icon-shape bg-warning bg-opacity-10 text-warning me-3"><i class="fas fa-star"></i></div>
-                        <div><p class="text-muted mb-0 small">Statut Compte</p><h3 id="stat-count-3" class="fw-bold m-0">Actif</h3></div>
-                    </div>
+            <div class="user-info">
+                <i class="fas fa-user-circle" style="font-size: 2rem; color: var(--primary);"></i>
+                <div>
+                    <p class="mb-0 fw-bold" id="user-name">Utilisateur</p>
+                    <small class="text-muted" id="user-email">user@example.com</small>
                 </div>
             </div>
-
-            <!-- Charts (Visible only for Admin) -->
-            <div id="admin-charts" class="row g-4 admin-only">
-                <div class="col-lg-8"><div class="glass-card"><h5>Analytique des ventes</h5><canvas id="barChart" height="300"></canvas></div></div>
-                <div class="col-lg-4"><div class="glass-card"><h5>Top Catégories</h5><canvas id="pieChart" height="300"></canvas></div></div>
-            </div>
-
-            <!-- User Bookings Summary (Visible for Standard User) -->
-             <div class="user-only mt-4">
-                <div class="glass-card">
-                    <h5 class="fw-bold mb-4">Activités Récentes</h5>
-                    <p class="text-muted small">Retrouvez vos dernières réservations dans l'onglet "Mes Réservations".</p>
-                    <button class="btn btn-primary rounded-pill px-4" onclick="dashManager.showSection('bookings')">Voir mes billets</button>
-                </div>
-             </div>
         </div>
 
-        <!-- SECTION: DATA TABLES (Users/Events/Bookings) -->
-        <div id="section-data" class="dash-section">
-            <div class="glass-card p-0 overflow-hidden">
-                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
-                    <h5 id="table-title" class="fw-bold m-0 text-primary">Liste des données</h5>
+        <!-- ============ OVERVIEW SECTION ============ -->
+        <div id="overview" class="dashboard-section active">
+            <div class="row mb-5">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">
+                            <i class="fas fa-ticket-alt"></i>
+                        </div>
+                        <p class="stat-label">Réservations</p>
+                        <p class="stat-value" id="total-bookings">0</p>
+                    </div>
                 </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <p class="stat-label">Événements</p>
+                        <p class="stat-value" id="total-events">0</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <p class="stat-label">Note</p>
+                        <p class="stat-value" id="user-rating">4.5</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <p class="stat-label">Abonnés</p>
+                        <p class="stat-value" id="followers">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ BOOKINGS SECTION ============ -->
+        <div id="bookings" class="dashboard-section">
+            <div class="stat-card">
+                <h3 class="mb-4"><i class="fas fa-ticket-alt"></i> Mes réservations</h3>
                 <div class="table-responsive">
-                    <table class="table table-custom m-0 align-middle">
-                        <thead id="table-head"></thead>
-                        <tbody id="table-body"></tbody>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>N° Réservation</th>
+                                <th>Événement</th>
+                                <th>Date</th>
+                                <th>Statut</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookings-table">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Chargement en cours...</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- SECTION: VALIDATION -->
-        <div id="section-validation" class="dash-section">
-            <div class="glass-card p-0 overflow-hidden">
-                <div class="p-4 border-bottom bg-warning bg-opacity-10 text-warning-emphasis"><h5 class="fw-bold m-0">Approbation des événements</h5></div>
+        <!-- ============ MY EVENTS SECTION ============ -->
+        <div id="my-events" class="dashboard-section organizer-only">
+            <div class="stat-card">
+                <h3 class="mb-4"><i class="fas fa-calendar-alt"></i> Mes événements</h3>
                 <div class="table-responsive">
-                    <table class="table table-custom m-0 align-middle">
-                        <thead><tr><th>Événement</th><th>Organisateur</th><th>Date</th><th>Actions</th></tr></thead>
-                        <tbody id="pending-events-table"></tbody>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Nom de l'événement</th>
+                                <th>Date</th>
+                                <th>Participants</th>
+                                <th>Statut</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-table">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Chargement en cours...</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- SECTION: SCANNER -->
-        <div id="tab-scanner" class="dash-section text-center">
-            <div class="glass-card mx-auto shadow-lg" style="max-width: 600px;">
-                <h4 class="fw-bold mb-4 text-primary"><i class="fas fa-qrcode me-2"></i>Scanner de Contrôle</h4>
-                <div id="reader" class="rounded-4 overflow-hidden border"></div>
-                <button class="btn btn-danger mt-4 rounded-pill px-5 fw-bold" onclick="dashManager.stopScanner()">Arrêter la caméra</button>
-            </div>
-        </div>
-    </main>
-
-    <!-- MODAL: Ticket View -->
-    <div class="modal fade" id="ticketModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 bg-transparent">
-                <div class="modal-body p-0">
-                    <div id="ticket-to-print" class="bg-white shadow-2xl">
-                        <div class="ticket-header text-center">
-                            <h4 class="m-0 fw-bold">BILLET OFFICIEL</h4>
-                            <p id="ticket-event-title" class="m-0 small opacity-75 mt-1"></p>
+        <!-- ============ ADD EVENT SECTION ============ -->
+        <div id="add-event" class="dashboard-section organizer-only">
+            <div class="stat-card">
+                <h3 class="mb-4"><i class="fas fa-plus-circle"></i> Ajouter un nouvel événement</h3>
+                <form id="add-event-form">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Nom de l'événement</label>
+                            <input type="text" class="form-control" name="title" required>
                         </div>
-                        <div class="p-5 text-center bg-white text-dark">
-                            <div id="ticket-qrcode" class="mb-4 d-inline-block p-3 border rounded-4 bg-light shadow-sm"></div>
-                            <h5 id="ticket-number" class="fw-bold text-primary mb-4"></h5>
-                            <div class="row text-start mt-4 border-top pt-3">
-                                <div class="col-6"><small class="text-muted d-block uppercase" style="font-size:10px">Participant</small><span id="ticket-user" class="fw-bold small"></span></div>
-                                <div class="col-6 text-end"><small class="text-muted d-block uppercase" style="font-size:10px">Date Event</small><span id="ticket-date" class="fw-bold small"></span></div>
-                            </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Catégorie</label>
+                            <select class="form-select" name="category_id" id="category-select" required></select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Prix (DH)</label>
+                            <input type="number" class="form-control" name="price" value="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Lieu</label>
+                            <input type="text" class="form-control" name="venue_address" placeholder="Fès" required>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" name="description" rows="3" required></textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Date de début</label>
+                            <input type="datetime-local" class="form-control" name="start_date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Image</label>
+                            <input type="file" class="form-control" name="image" accept="image/*">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary-custom w-100">
+                                <i class="fas fa-paper-plane"></i> Publier l'événement
+                            </button>
                         </div>
                     </div>
-                    <div class="text-center mt-4">
-                        <button onclick="bookingFlow.downloadPDF()" class="btn btn-warning rounded-pill px-5 fw-bold shadow-lg me-2 text-dark"><i class="fas fa-file-pdf me-2"></i>PDF</button>
-                        <button class="btn btn-light rounded-pill px-4 shadow" data-bs-dismiss="modal">Fermer</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ============ USERS SECTION ============ -->
+        <div id="users" class="dashboard-section admin-only">
+            <div class="stat-card">
+                <h3 class="mb-4"><i class="fas fa-users"></i> Utilisateurs</h3>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Email</th>
+                                <th>Rôle</th>
+                                <th>Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Chargement en cours...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ STATISTICS SECTION ============ -->
+        <div id="statistics" class="dashboard-section admin-only">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="stat-card">
+                        <h4 class="mb-4">Statistiques des réservations</h4>
+                        <canvas id="bookings-chart"></canvas>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stat-card">
+                        <h4 class="mb-4">Distribution des catégories</h4>
+                        <canvas id="categories-chart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="js/app.js"></script>
+    <!-- ============ SCRIPTS ============ -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/dashboard.js"></script>
+
 </body>
 </html>

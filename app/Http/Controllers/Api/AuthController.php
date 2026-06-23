@@ -3,89 +3,163 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Models\Booking;
+use App\Models\Event;
+use App\Mail\BookingConfirmation;
 use Illuminate\Http\JsonResponse;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
-class AuthController extends Controller
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Exception;
+
+class BookingController extends Controller
 {
-    
-    public function register(Request $request) : JsonResponse
+    /**
+     * جلب حجوزات المستخدم الحالي (History)
+     */
+    public function myBookings(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required','string','max:255'],
-            'email' => ['required','string','email','max:255','unique:users,email'],
-            'password' => ['required','string','min:8','confirmed'],
-        ]);
+        $bookings = $request->user()->bookings()
+            ->with(['event:id,title,start_date,venue_name,image,city'])
+            ->latest()
+            ->get();
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-        ]);
-
-        $token = $user->createToken('api')->plainTextToken;
         return response()->json([
             'success' => true,
-            'message' => 'User registered successfully',
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-            ],
-        ], 201);
+            'data' => $bookings
+        ]);
     }
 
-
-
-    public function login(Request $request) : JsonResponse
+    /**
+     * عملية الحجز الاحترافية (Store Booking)
+     * ميزة رائعة: استخدام Transaction لمنع تجاوز العدد المسموح
+     */
+    public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'email' => ['required','string','email'],
-            'password' => ['required','string'],
+        $validator = Validator::make($request->all(), [
+            'event_id' => 'required|exists:events,id',
+            'quantity' => 'required|integer|min:1|max:10',
+            'attendee_name' => 'required|string|max:255',
+            'attendee_email' => 'required|email',
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['identifiants invalides'],
+        return DB::transaction(function () use ($request) {
+            // استخدام lockForUpdate لمنع التلاعب بالعدد في اللحظات المتزامنة
+            $event = Event::where('id', $request->event_id)->lockForUpdate()->first();
+
+            // 1. التحقق من توفر الأماكن
+            if ($event->max_attendees && ($event->current_attendees + $request->quantity) > $event->max_attendees) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Désolé, cet événement est complet ou les places sont insuffisantes.'
+                ], 400);
+            }
+
+            // 2. إنشاء الحجز
+            $booking = Booking::create([
+                'user_id' => Auth::id(),
+                'event_id' => $event->id,
+                'quantity' => $request->quantity,
+                'unit_price' => $event->price,
+                'total_amount' => $event->price * $request->quantity,
+                'currency' => $event->currency ?? 'MAD',
+                'attendee_name' => $request->attendee_name,
+                'attendee_email' => $request->attendee_email,
+                'status' => 'confirmed',
+                'payment_status' => ($event->price == 0) ? 'paid' : 'pending',
+                'confirmed_at' => now(),
             ]);
+
+            // 3. تحديث عداد الحاضرين في الفعالية
+            $event->increment('current_attendees', $request->quantity);
+
+            // 4. إرسال إيميل التأكيد (اختياري/محمي)
+            try {
+                Mail::to($booking->attendee_email)->send(new BookingConfirmation($booking));
+            } catch (Exception $e) {
+                // نسجل الخطأ في اللوج ولا نعطل الحجز
+                Log::warning("Email booking failed: " . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Réservation réussie ! Votre billet est prêt.',
+                'booking_number' => $booking->booking_number,
+                'data' => $booking->load('event')
+            ], 201);
+        });
+    }
+
+    /**
+     * جلب بيانات التذكرة مع الـ QR Code للعرض في المودال
+     */
+    public function getTicketData(string $booking_number): JsonResponse
+    {
+        $booking = Booking::with(['event', 'user:id,name'])
+            ->where('booking_number', $booking_number)
+            ->first();
+
+        if (!$booking) {
+            return response()->json(['success' => false, 'message' => 'Billet introuvable'], 404);
         }
 
-        $token = $user->createToken('api')->plainTextToken;
+        // الأمان: التأكد أن صاحب التذكرة أو الأدمن هو من يطلبها
+        $currentUser = Auth::user();
+        if ($currentUser->id !== $booking->user_id && $currentUser->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Accès refusé'], 403);
+        }
+
+        // توليد الـ QR Code بصيغة SVG ليتم عرضه في الـ HTML مباشرة
+        $qrCode = QrCode::size(200)
+            ->color(83, 34, 0) // لون بني ملكي
+            ->margin(1)
+            ->generate($booking->booking_number);
+
         return response()->json([
             'success' => true,
-            'message' => 'connexion réussie',
             'data' => [
-                'user' => $user,
-                'token' => $token,
-            ],
-        ], 200);
+                'booking' => $booking,
+                'qr_code' => (string) $qrCode
+            ]
+        ]);
     }
 
-
-
-    public function logout(Request $request) : JsonResponse
+    /**
+     * ميزة "أفضل من Atlas Haven": نظام الـ Scanner للمنظمين
+     * يتم استدعاؤه من تطبيق الهاتف أو كاميرا الحاسوب في لوحة التحكم
+     */
+    public function checkIn(Request $request): JsonResponse
     {
-       $user = $request->user();
-       if($user&& $user->currentAccessToken()){
-        $user->currentAccessToken()->delete(); 
+        $request->validate(['booking_number' => 'required|string']);
+
+        $booking = Booking::where('booking_number', $request->booking_number)->first();
+
+        if (!$booking) {
+            return response()->json(['success' => false, 'message' => 'Ticket invalide ou inexistant.'], 404);
         }
-        return response()->json([
-            'success' => true,
-            'message' => 'Déconnexion réussie',
-        ], 200);
-      
-        
-    }
 
+        if ($booking->status === 'attended') {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Attention: Ce ticket a déjà été utilisé à ' . $booking->updated_at->format('H:i')
+            ], 422);
+        }
 
-    public function me(Request $request) : JsonResponse
-    {
+        // تحديث حالة الحضور
+        $booking->update(['status' => 'attended']);
+
         return response()->json([
-            'success' => true,
-            'data' => $request->user(),
-        ], 200);
+            'success' => true, 
+            'message' => 'Bienvenue ! Accès autorisé pour: ' . $booking->attendee_name,
+            'attendee' => $booking->attendee_name
+        ]);
     }
 }
