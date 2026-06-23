@@ -13,59 +13,64 @@ return new class extends Migration
     {
         Schema::create('events', function (Blueprint $table) {
             $table->id();
-            //information de base
+            
+            // --- المعلومات الأساسية ---
             $table->string('title');
-            $table->string('slug')->unique();
+            $table->string('slug')->unique(); // للروابط الصديقة لمحركات البحث SEO
             $table->text('description');
-            $table->text('short_description')->nullable();
-            $table->string('image')->nullable();
-            $table->json('gallery')->nullable();
-            //organisateur
+            $table->string('short_description', 255)->nullable();
+            $table->string('image')->nullable(); // مسار الصورة الرئيسية
+            $table->json('gallery')->nullable(); // لتخزين عدة صور إضافية (اختياري)
+            
+            // --- العلاقات ---
+            // منظم الفعالية (يرتبط بجدول المستخدمين)
             $table->foreignId('organizer_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('category_id')->constrained()->onDelete('cascade');
+            // صنف الفعالية (يرتبط بجدول الأصناف)
+            $table->foreignId('category_id')->constrained('categories')->onDelete('cascade');
 
-            //date et heure
+            // --- الزمان والمكان ---
             $table->dateTime('start_date');
-            $table->dateTime('end_date');
+            $table->dateTime('end_date')->nullable();
             $table->string('timezone')->default('Africa/Casablanca');
-            //lieu
-            $table->string('venue_name');
-            $table->text('venue_address');
-            $table->string('city');
-            $table->string('country')->default('Morocco');
+            $table->string('venue_name'); // اسم المكان (مثلاً: قصر المؤتمرات)
+            $table->text('venue_address'); // العنوان الكامل
+            $table->string('city'); // المدينة (لسهولة الفلترة)
+            
+            // إحداثيات الخريطة (Leaflet/Google Maps)
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
 
-            //tarification
-            $table->decimal('price', 8, 2)->default(0);
+            // --- المالية والطاقة الاستيعابية ---
+            $table->decimal('price', 10, 2)->default(0.00);
             $table->boolean('is_free')->default(false);
             $table->string('currency', 3)->default('MAD');
+            $table->integer('max_attendees'); // أقصى عدد للحضور
+            $table->integer('current_attendees')->default(0); // العداد الحالي للمحجوزات
 
-            //Capacité 
-            $table->integer('max_attendees')->nullable();
-            $table->integer('current_attendees')->default(0);
-
-            //statut
-            $table->enum('status', ['draft', 'pending','published','rejected', 'cancelled','completed'])->default('draft');
-            $table->boolean('is_featured')->default(false);
-            $table->boolean('requires_approval')->default(true);
-            $table->text('rejection_reason')->nullable();
+            // --- حالة الفعالية ونظام الموافقة ---
+            // pending: في انتظار مراجعة الآدمن
+            // published: معروضة للعموم
+            // rejected: مرفوضة من قبل الإدارة
+            // canceled: ملغاة من المنظم
+            $table->enum('status', ['pending', 'published', 'rejected', 'canceled', 'completed'])
+                  ->default('pending');
+            
+            $table->boolean('is_featured')->default(false); // هل تظهر في السلايدر الرئيسي؟
+            $table->text('rejection_reason')->nullable(); // سبب الرفض في حال رفضها الآدمن
+            
+            // تتبع المراجعة
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->datetime('reviewed_at')->nullable();
-
-            //SEO et métadonnées
-            $table->string('meta_title')->nullable();
-            $table->text('meta_description')->nullable();
-            $table->json('tags')->nullable();
+            $table->timestamp('reviewed_at')->nullable();
 
             $table->timestamps();
-            //index pour les recherches 
+
+            // --- الفهارس (Indexes) لتسريع البحث في قاعدة البيانات ---
             $table->index(['status', 'start_date']);
-            $table->index(['city', 'start_date']);
-            $table->index(['category_id', 'start_date']);
+            $table->index('city');
+            $table->index('slug');
         });
     }
-    
+
     /**
      * Reverse the migrations.
      */

@@ -3,60 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EventHub Fès | Plateforme de Réservation Pro</title>
+    <title>EventHub Fès | Plateforme de Réservation Intelligence</title>
     
-    <!-- 1. CSS Dependencies -->
+    <!-- 1. CSS & Fonts -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     
-    <!-- 2. External Libraries (Maps & PDF) -->
+    <!-- 2. Libraries CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- 3. Core Libraries JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        :root { --primary: #0d6efd; --dark-fez: #003366; --gold: #ffc107; }
-        body { font-family: 'Poppins', sans-serif; background-color: #f8f9fa; color: #333; }
-        
-        /* UI Components */
-        .navbar { backdrop-filter: blur(10px); background-color: rgba(33, 37, 41, 0.9) !important; }
-        .hero { 
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1549913772-820279f902b4?q=80&w=2070');
-            background-size: cover; background-position: center; height: 50vh; display: flex; align-items: center; justify-content: center; color: white; text-align: center;
+        :root { 
+            --primary: #4361ee; 
+            --dark-navy: #0f172a; 
+            --gold: #ffb703;
+            --soft-bg: #f8fafc;
         }
-        .search-container { max-width: 800px; margin: -40px auto 0; position: relative; z-index: 10; }
-        .search-box { background: white; padding: 10px; border-radius: 50px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
-        
-        /* Event Cards */
-        .event-card { border: none; border-radius: 20px; overflow: hidden; transition: 0.3s; background: white; height: 100%; }
-        .event-card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
-        .card-img-top { height: 200px; object-fit: cover; }
 
-        /* Category Pills */
+        body { font-family: 'Inter', sans-serif; background-color: var(--soft-bg); color: #1e293b; overflow-x: hidden; }
+
+        /* UI Elements */
+        .navbar { backdrop-filter: blur(15px); background-color: rgba(15, 23, 42, 0.95) !important; padding: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .hero { 
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('https://images.unsplash.com/photo-1549913772-820279f902b4?q=80&w=2070');
+            background-size: cover; background-position: center; height: 50vh; 
+            display: flex; align-items: center; justify-content: center; color: white; text-align: center;
+        }
+
+        /* Search Bar */
+        .search-container { max-width: 900px; margin: -50px auto 0; position: relative; z-index: 100; }
+        .search-box { 
+            background: white; padding: 12px; border-radius: 20px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;
+        }
+
+        /* Event Cards */
+        .event-card { 
+            border: none; border-radius: 24px; overflow: hidden; 
+            transition: 0.4s ease; background: white; height: 100%; border: 1px solid #f1f5f9;
+        }
+        .event-card:hover { transform: translateY(-12px); box-shadow: 0 20px 30px rgba(0,0,0,0.08); }
+        .card-img-container { height: 210px; overflow: hidden; position: relative; }
+        .card-img-top { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Date Badge on Image */
+        .date-badge {
+            position: absolute; top: 15px; left: 15px; background: white;
+            padding: 5px 12px; border-radius: 12px; text-align: center; box-shadow: 0 5px 10px rgba(0,0,0,0.1); z-index: 10;
+        }
+        .date-badge .day { display: block; font-weight: 800; font-size: 1.1rem; color: var(--primary); line-height: 1; }
+        .date-badge .month { font-size: 9px; text-transform: uppercase; font-weight: 600; color: #64748b; }
+
+        /* Rating Stars */
+        .rating-stars i { cursor: pointer; color: #cbd5e1; transition: 0.2s; font-size: 1.4rem; }
+        .rating-stars i.fas { color: var(--gold); }
+
+        /* Ticket Design for PDF */
+        #ticket-to-print { 
+            background: white !important; color: black !important; border-radius: 20px; 
+            width: 450px; margin: auto; border: 2px dashed #cbd5e1; overflow: hidden;
+        }
+        .ticket-header { background: var(--dark-navy) !important; color: white !important; padding: 25px; text-align: center; }
+
+        /* Chatbot UI */
+        #chat-window { position: fixed; bottom: 100px; right: 25px !important; width: 330px; border-radius: 24px; z-index: 1000; border: none; display: none; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .chat-bubble { position: fixed; bottom: 35px; right: 110px; z-index: 999; width: 65px; height: 65px; border-radius: 50%; box-shadow: 0 10px 20px rgba(67, 97, 238, 0.3); }
+        
+        /* Map Box */
+        #map { height: 280px; width: 100%; border-radius: 20px; border: 1px solid #e2e8f0; }
+
         .category-pill { 
-            cursor: pointer; padding: 8px 20px; border-radius: 30px; background: white; border: 1px solid #ddd; 
-            transition: 0.3s; white-space: nowrap; margin-right: 10px; display: inline-block; font-size: 14px;
+            cursor: pointer; padding: 10px 25px; border-radius: 50px; background: white; 
+            border: 1px solid #e2e8f0; transition: 0.3s; white-space: nowrap; margin-right: 12px;
+            font-weight: 500; font-size: 14px;
         }
         .category-pill.active, .category-pill:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
-        /* Map & Ticket Styles */
-        #map { height: 250px; width: 100%; border-radius: 15px; border: 1px solid #eee; margin-top: 10px; }
-        #ticket-to-print { background: white !important; color: black !important; border-radius: 15px; border: 2px dashed #ccc; overflow: hidden; max-width: 450px; margin: auto; }
-        .ticket-header { background: var(--dark-fez) !important; color: white !important; padding: 20px; }
-        
-        /* Stars Rating */
-        .rating-stars i { cursor: pointer; transition: 0.2s; }
-        .rating-stars i:hover { transform: scale(1.2); }
+        /* Footer */
+        footer { background-color: var(--dark-navy) !important; color: #94a3b8; }
+        .footer-link { color: #94a3b8; text-decoration: none; transition: 0.3s; }
+        .footer-link:hover { color: white; padding-left: 5px; }
 
-        .btn-add-event { position: fixed; bottom: 30px; right: 30px; z-index: 1000; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        /* Floating Buttons */
+        .btn-add-event { position: fixed; bottom: 35px; right: 35px; z-index: 999; width: 65px; height: 65px; border-radius: 50%; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
-    <!-- Navigation -->
+    <!-- 1. Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
             <a class="navbar-brand fw-bold fs-3" href="index.html">Event<span class="text-primary">Hub</span></a>
@@ -65,159 +107,242 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto"></ul>
-                <div id="auth-section" class="d-flex align-items-center"></div>
+                <div id="auth-section"></div>
             </div>
         </div>
     </nav>
 
-    <!-- Hero -->
+    <!-- 2. Hero Section -->
     <header class="hero">
         <div class="container" data-aos="zoom-in">
-            <h1 class="display-4 fw-bold text-white">Vivez l'expérience Fès</h1>
-            <p class="lead">Réservez vos places pour les meilleurs événements culturels et technologiques.</p>
+            <h1 class="display-3 fw-bold mb-2">Vivez Fès Autrement</h1>
+            <p class="lead fs-4 opacity-75">Explorez les meilleurs événements de la ville spirituelle.</p>
         </div>
     </header>
 
-    <!-- Search -->
+    <!-- 3. Advanced Search Bar -->
     <div class="container search-container" data-aos="fade-up">
         <div class="search-box">
-            <form id="search-form" class="row g-2 px-3">
-                <div class="col-md-9">
-                    <input type="text" id="search-input" class="form-control border-0 px-2" placeholder="Nom de l'événement, ville, lieu...">
+            <form id="search-form" class="row g-2 align-items-center">
+                <div class="col-md-5 border-end">
+                    <input type="text" id="search-input" class="form-control border-0" placeholder="Quel événement cherchez-vous ?">
+                </div>
+                <div class="col-md-4 border-end">
+                    <input type="date" id="date-input" class="form-control border-0 text-muted">
                 </div>
                 <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Rechercher</button>
+                    <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold py-2">Rechercher</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <main class="container my-5 pt-4">
-        <!-- Categories Pills -->
-        <div id="categories-nav" class="d-flex overflow-x-auto pb-3 mb-5" data-aos="fade-right">
+    <!-- 4. Main Content -->
+    <main class="container my-5 pt-5">
+        <div id="categories-nav" class="d-flex overflow-x-auto pb-4 mb-4">
             <div class="category-pill active" onclick="events.fetchAll()">Tout</div>
-            <!-- Dynamic Categories -->
         </div>
 
         <section id="events-section">
-            <h3 class="fw-bold mb-4">Événements à découvrir</h3>
+            <h3 class="fw-bold mb-4 border-start border-primary border-4 ps-3">Événements à venir</h3>
             <div id="events-container" class="row g-4">
-                <!-- Skeleton Loading -->
-                <div class="text-center py-5 w-100"><div class="spinner-border text-primary"></div></div>
+                <div class="text-center py-5 w-100">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2 text-muted">Chargement en cours...</p>
+                </div>
             </div>
         </section>
     </main>
 
-    <!-- Floating Action Button -->
-    <button id="add-event-fab" class="btn btn-primary btn-add-event d-none shadow-lg" onclick="ui.showEventModal()">
-        <i class="fas fa-plus fs-3"></i>
-    </button>
-
-    <!-- MODALS -->
-
-    <!-- 1. Event Details Modal (MAP + REVIEWS) -->
-    <div class="modal fade" id="eventDetailsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title fw-bold" id="detail-title">...</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <div class="row">
-                        <div class="col-md-6 border-end">
-                            <img id="detail-image" src="" class="img-fluid rounded-4 mb-3 shadow-sm" style="height:250px; width:100%; object-fit:cover;">
-                            <p id="detail-description" class="text-muted small mb-4"></p>
-                            
-                            <!-- Reviews List -->
-                            <h6 class="fw-bold"><i class="fas fa-star text-warning me-2"></i>Avis des participants</h6>
-                            <div id="reviews-list" class="mb-3" style="max-height: 180px; overflow-y: auto;"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="bg-light p-3 rounded-4 mb-3 shadow-sm">
-                                <p class="mb-2 small"><strong>Lieu:</strong> <span id="detail-venue"></span></p>
-                                <p class="mb-0 text-primary fs-4 fw-bold" id="detail-price"></p>
-                            </div>
-                            <!-- Leaflet Map -->
-                            <div id="map"></div>
-
-                            <!-- Add Review Form -->
-                            <div id="add-review-section" class="mt-4 p-3 border rounded-4 bg-white">
-                                <label class="small fw-bold d-block mb-2">Noter l'événement :</label>
-                                <div class="rating-stars mb-2 text-warning fs-4">
-                                    <i class="far fa-star" data-val="1"></i><i class="far fa-star" data-val="2"></i><i class="far fa-star" data-val="3"></i><i class="far fa-star" data-val="4"></i><i class="far fa-star" data-val="5"></i>
-                                </div>
-                                <textarea id="review-comment" class="form-control form-control-sm mb-2" placeholder="Votre commentaire..."></textarea>
-                                <button onclick="reviewManager.submit()" class="btn btn-sm btn-dark w-100 rounded-pill">Publier l'avis</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer border-0">
-                    <button id="detail-reserve-btn" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow">Réserver maintenant</button>
+    <!-- 5. Chatbot Section (Voice Integrated) -->
+    <div id="chatbot-container">
+        <button id="chat-bubble" class="btn btn-primary shadow-lg chat-bubble" onclick="botManager.toggle()">
+            <i class="fas fa-comment-dots fs-3"></i>
+        </button>
+        
+        <div id="chat-window" class="card shadow-2xl position-fixed bg-white border-0">
+            <div class="card-header bg-primary text-white p-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold small"><i class="fas fa-robot me-2"></i>Assistant EventBot</span>
+                <button class="btn-close btn-close-white btn-sm" onclick="botManager.toggle()"></button>
+            </div>
+            <div id="chat-messages" class="card-body bg-light" style="height: 300px; overflow-y: auto; font-size: 13px;">
+                <div class="bot-msg mb-3"><div class="bg-white p-2 rounded shadow-sm border-start border-primary border-3">Bonjour ! Je suis EventBot. Vous pouvez me parler ou écrire. 😊</div></div>
+            </div>
+            <div class="card-footer bg-white border-0 p-2">
+                <div class="input-group">
+                    <button class="btn btn-outline-secondary btn-sm rounded-circle me-1" onclick="botManager.startListening()" title="Parler">
+                        <i class="fas fa-microphone" id="mic-icon"></i>
+                    </button>
+                    <input type="text" id="chat-input" class="form-control form-control-sm border-0 bg-light rounded-pill px-3" placeholder="Votre message...">
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 2. Auth Modals -->
-    <div class="modal fade" id="loginModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="login-form">
-        <div class="modal-header bg-primary text-white"><h5>Connexion</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <!-- 6. Footer -->
+    <footer class="pt-5 pb-4 mt-5">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4" data-aos="fade-up">
+                    <h3 class="fw-bold text-white mb-3">Event<span>Hub</span></h3>
+                    <p class="small opacity-75 leading-relaxed">Découvrez la richesse culturelle de Fès à travers notre plateforme intelligente de réservation.</p>
+                </div>
+                <div class="col-lg-2 offset-lg-1" data-aos="fade-up" data-aos-delay="100">
+                    <h6 class="text-white fw-bold mb-3">Liens</h6>
+                    <ul class="list-unstyled small">
+                        <li><a href="#" class="footer-link d-block mb-2">Accueil</a></li>
+                        <li><a href="#events-section" class="footer-link d-block mb-2">Événements</a></li>
+                        <li><a href="dashboard.html" class="footer-link d-block mb-2">Dashboard</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-2" data-aos="fade-up" data-aos-delay="200">
+                    <h6 class="text-white fw-bold mb-3">Aide</h6>
+                    <ul class="list-unstyled small">
+                        <li><a href="#" class="footer-link d-block mb-2">Contact</a></li>
+                        <li><a href="#" class="footer-link d-block mb-2">Confidentialité</a></li>
+                        <li><a href="#" class="footer-link d-block mb-2">FAQ</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 text-lg-end" data-aos="fade-up" data-aos-delay="300">
+                    <h6 class="text-white fw-bold mb-3">Suivez-nous</h6>
+                    <div class="d-flex justify-content-lg-end gap-3">
+                        <a href="#" class="btn btn-outline-light btn-sm rounded-circle shadow-sm"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="btn btn-outline-light btn-sm rounded-circle shadow-sm"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="btn btn-outline-light btn-sm rounded-circle shadow-sm"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-4 opacity-10">
+            <p class="text-center small opacity-50 m-0">&copy; 2024 EventHub Fès. Créé pour le PFE.</p>
+        </div>
+    </footer>
+
+    <!-- MODALS -->
+
+    <!-- Event Details Modal (Maps + Stars) -->
+    <div class="modal fade" id="eventDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-5 overflow-hidden">
+                <div class="modal-header bg-dark text-white p-3">
+                    <h5 class="modal-title fw-bold" id="detail-title">...</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="row g-0">
+                        <div class="col-md-6 p-4 border-end">
+                            <img id="detail-image" src="" class="img-fluid rounded-4 mb-3 shadow-sm" style="height:220px; width:100%; object-fit:cover;">
+                            <p id="detail-description" class="text-muted small leading-relaxed mb-4"></p>
+                            <h6 class="fw-bold mb-3 small text-uppercase">Avis des participants</h6>
+                            <div id="reviews-list" class="mb-3 overflow-auto" style="max-height: 150px;"></div>
+                        </div>
+                        <div class="col-md-6 p-4 bg-light bg-opacity-50">
+                            <div class="bg-white p-3 rounded-4 shadow-sm mb-3 border">
+                                <p class="small mb-1 text-danger fw-bold"><i class="fas fa-map-marker-alt"></i> <span id="detail-venue"></span></p>
+                                <p id="detail-price" class="h5 fw-bold text-primary m-0"></p>
+                            </div>
+                            <div id="map"></div>
+                            <!-- Star Rating Form -->
+                            <div id="add-review-section" class="mt-3 p-3 bg-white rounded-4 border shadow-sm">
+                                <div class="rating-stars mb-2 text-center">
+                                    <i class="far fa-star text-warning" data-val="1"></i><i class="far fa-star text-warning" data-val="2"></i><i class="far fa-star text-warning" data-val="3"></i><i class="far fa-star text-warning" data-val="4"></i><i class="far fa-star text-warning" data-val="5"></i>
+                                </div>
+                                <textarea id="review-comment" class="form-control form-control-sm mb-2" placeholder="Votre avis..."></textarea>
+                                <button onclick="reviewManager.submit()" class="btn btn-dark w-100 btn-sm rounded-pill py-2 fw-bold">Publier</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-3">
+                    <button id="detail-reserve-btn" class="btn btn-primary w-100 py-2 rounded-pill fw-bold">Réserver ma place</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modals -->
+    <div class="modal fade" id="loginModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-5"><form id="login-form">
+        <div class="modal-header bg-primary text-white p-4"><h5>Connexion</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
         <div class="modal-body p-4">
             <div class="mb-3"><label class="small fw-bold">Email</label><input type="email" id="login-email" class="form-control rounded-pill" required></div>
             <div class="mb-4"><label class="small fw-bold">Mot de passe</label><input type="password" id="login-password" class="form-control rounded-pill" required></div>
-            <button type="submit" class="btn btn-primary w-100 py-2 rounded-pill fw-bold">Se connecter</button>
+            <button type="submit" class="btn btn-primary w-100 py-2 rounded-pill fw-bold">Entrer</button>
+            <div class="text-center mt-3 small">Pas encore de compte ? <a href="#" data-bs-toggle="modal" data-bs-target="#registerModal">S'inscrire</a></div>
         </div>
     </form></div></div></div>
 
-    <div class="modal fade" id="registerModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="register-form">
-        <div class="modal-header bg-success text-white"><h5>Inscription</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body p-4">
+    <div class="modal fade" id="registerModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-5"><form id="register-form">
+        <div class="modal-header bg-success text-white p-4"><h5>Inscription</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body p-4 text-start">
             <div class="mb-3"><input type="text" id="register-name" class="form-control rounded-pill" placeholder="Nom complet" required></div>
             <div class="mb-3"><input type="email" id="register-email" class="form-control rounded-pill" placeholder="Email" required></div>
             <div class="mb-3"><input type="password" id="register-password" class="form-control rounded-pill" placeholder="Mot de passe" required minlength="8"></div>
             <div class="mb-4"><input type="password" id="register-password-confirm" class="form-control rounded-pill" placeholder="Confirmer" required></div>
-            <button type="submit" class="btn btn-success w-100 py-2 rounded-pill fw-bold text-white">Créer mon compte</button>
+            <button type="submit" class="btn btn-success w-100 py-2 rounded-pill fw-bold text-white shadow-sm">Créer mon compte</button>
         </div>
     </form></div></div></div>
 
-    <!-- 3. Ticket & Payment Modals -->
-    <div class="modal fade" id="paymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content shadow-lg"><form id="payment-form">
-        <div class="modal-header border-0"><h5 class="fw-bold">Paiement Sécurisé</h5></div>
-        <div class="modal-body p-4">
-            <div id="payment-event-info" class="alert alert-info border-0 rounded-4 mb-4"></div>
-            <div class="mb-3"><label class="small fw-bold">Numéro de carte</label><input type="text" class="form-control" placeholder="4242 4242..." required></div>
-            <button type="submit" id="pay-btn" class="btn btn-success w-100 py-3 rounded-pill fw-bold shadow-sm">Confirmer & Payer</button>
-        </div>
-    </form></div></div></div>
-
-    <div class="modal fade" id="ticketModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 bg-transparent">
-                <div class="modal-body p-0 text-center">
-                    <div id="ticket-to-print" class="shadow-2xl">
-                        <div class="ticket-header"><h4>VOTRE TICKET</h4><p id="ticket-event-title" class="m-0 small text-uppercase"></p></div>
-                        <div class="p-4 bg-white">
-                            <div id="ticket-qrcode" class="mb-3 d-inline-block p-2 border rounded bg-light"></div>
-                            <h5 id="ticket-number" class="fw-bold text-primary mb-3"></h5>
-                            <hr>
-                            <div class="row text-start mt-3">
-                                <div class="col-6"><small class="text-muted d-block">Participant</small><span id="ticket-user" class="fw-bold"></span></div>
-                                <div class="col-6 text-end"><small class="text-muted d-block">Date</small><span id="ticket-date" class="fw-bold"></span></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-4"><button onclick="bookingFlow.downloadPDF()" class="btn btn-warning rounded-pill px-4 fw-bold me-2"><i class="fas fa-file-pdf me-2"></i>PDF</button><button class="btn btn-light rounded-pill px-4 shadow" data-bs-dismiss="modal">Fermer</button></div>
+    <!-- Ticket Modal -->
+    <div class="modal fade" id="ticketModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 bg-transparent"><div class="modal-body p-0 text-center">
+        <div id="ticket-to-print" class="shadow-2xl bg-white">
+            <div class="ticket-header"><h4>BILLET OFFICIEL</h4><p id="ticket-event-title" class="m-0 small text-uppercase opacity-75"></p></div>
+            <div class="p-4 bg-white">
+                <div id="ticket-qrcode" class="mb-4 d-inline-block p-3 border rounded shadow-sm bg-white"></div>
+                <h5 id="ticket-number" class="fw-bold text-primary mb-4 tracking-tighter"></h5>
+                <hr class="my-4 opacity-10">
+                <div class="row text-start px-3">
+                    <div class="col-6 mb-3"><small class="text-muted d-block uppercase" style="font-size:10px">Participant</small><span id="ticket-user" class="fw-bold small text-dark"></span></div>
+                    <div class="col-6 text-end mb-3"><small class="text-muted d-block uppercase" style="font-size:10px">Date Event</small><span id="ticket-date" class="fw-bold small text-dark"></span></div>
                 </div>
             </div>
         </div>
+        <div class="mt-4"><button onclick="bookingFlow.downloadPDF()" class="btn btn-warning rounded-pill px-5 fw-bold shadow-lg me-2 text-dark"><i class="fas fa-file-pdf me-2"></i>Télécharger PDF</button><button class="btn btn-light rounded-pill px-4 shadow" data-bs-dismiss="modal">Fermer</button></div>
+    </div></div></div></div>
+
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content shadow-lg border-0 rounded-5"><form id="payment-form">
+        <div class="modal-header border-0 p-4 text-center"><h5>Paiement Sécurisé</h5></div>
+        <div class="modal-body p-4 text-center">
+            <div id="payment-event-info" class="alert alert-info border-0 rounded-4 mb-4 fw-bold small text-dark"></div>
+            <div class="input-group mb-4 border rounded-pill overflow-hidden ps-3 bg-light">
+                <span class="input-group-text bg-transparent border-0"><i class="fas fa-credit-card text-muted"></i></span>
+                <input type="text" class="form-control border-0 bg-transparent" placeholder="4242 4242 4242 4242" required>
+            </div>
+            <button type="submit" id="pay-btn" class="btn btn-success w-100 py-3 rounded-pill fw-bold shadow-sm">Payer & Réserver</button>
+        </div>
+    </form></div></div></div>
+
+    <!-- Floating UI for Organizer -->
+    <button id="add-event-fab" class="btn btn-primary btn-add-event d-none shadow-lg" onclick="ui.showEventModal()"><i class="fas fa-plus fs-3"></i></button>
+
+    <!-- Add Event Modal -->
+    <div class="modal fade" id="addEventModal" tabindex="-1">
+        <div class="modal-dialog modal-lg"><div class="modal-content border-0 shadow-lg rounded-5"><form id="event-form">
+            <div class="modal-header bg-dark text-white p-4"><h5>Publier un nouvel événement</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body row g-3 p-4">
+                <div class="col-12"><label class="fw-bold small">TITRE</label><input type="text" name="title" class="form-control rounded-3" required></div>
+                <div class="col-md-6"><label class="fw-bold small">CATÉGORIE</label><select name="category_id" id="category-select" class="form-select"></select></div>
+                <div class="col-md-6"><label class="fw-bold small">PRIX (MAD)</label><input type="number" name="price" class="form-control rounded-3" value="0"></div>
+                <div class="col-12"><label class="fw-bold small">DESCRIPTION</label><textarea name="description" class="form-control rounded-3" rows="3" required></textarea></div>
+                <div class="col-md-6"><label class="fw-bold small">DATE DE DÉBUT</label><input type="datetime-local" name="start_date" class="form-control rounded-3" required></div>
+                <div class="col-md-6"><label class="fw-bold small">ADRESSE DU LIEU</label><input type="text" name="venue_address" class="form-control rounded-3" placeholder="Fès" required></div>
+                <div class="col-12"><label class="fw-bold small">IMAGE ILLUSTRATIVE</label><input type="file" name="image" class="form-control rounded-3" accept="image/*"></div>
+                
+                <input type="hidden" name="city" value="Fès">
+                <input type="hidden" name="max_attendees" value="200">
+                <input type="hidden" name="end_date" value="2026-12-31 23:59:00">
+                <input type="hidden" name="venue_name" value="Lieu Fès">
+            </div>
+            <div class="modal-footer border-0 p-4"><button type="submit" id="submit-event-btn" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow">Publier maintenant</button></div>
+        </form></div></div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Dependencies Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>AOS.init();</script>
+    <script>AOS.init({ duration: 800, once: true });</script>
+    
+    <!-- Core Application Logic -->
     <script src="js/app.js"></script>
+
 </body>
 </html>

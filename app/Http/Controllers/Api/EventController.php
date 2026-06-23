@@ -9,39 +9,57 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str; 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class EventController extends Controller
 {
     /**
-     * ملاحظة هامة لـ PFE: 
-     * لا تضع middleware('auth:sanctum') في الـ constructor هنا 
-     * لكي يتمكن الزوار من رؤية الأحداث دون تسجيل دخول.
-     */
-
-    /**
-     * عرض قائمة الفعاليات (للزوار والمستخدمين)
+     * عرض قائمة الفعاليات مع نظام فلترة متقدم (البحث، الأصناف، التاريخ)
      */
     public function index(Request $request): JsonResponse
     {
-        // جلب الأحداث المنشورة فقط مع فئاتها ومنظميها
+        // الاستعلام الأساسي: الفعاليات المنشورة فقط مع فئاتها ومنظميها
         $query = Event::with(['category', 'organizer'])->published();
 
-        // الفلترة حسب البحث النصي
+        // 1. الفلترة حسب البحث النصي (العنوان، الوصف، المدينة)
         if ($request->filled('search')) {
             $query->search($request->search);
         }
 
-        // الفلترة حسب الصنف (Category)
+        // 2. الفلترة حسب الصنف (Category)
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
         }
 
-        // الفلترة حسب المدينة
+        // 3. الفلترة حسب المدينة
         if ($request->filled('city')) {
             $query->where('city', 'like', '%' . $request->city . '%');
         }
 
-        // الترتيب حسب التاريخ الأقرب
+        // 4. الفلترة حسب السعر (مجاني / مدفوع)
+        if ($request->has('free')) {
+            $query->where('is_free', $request->free === 'true');
+        }
+
+        // 5. الفلترة حسب التاريخ (ميزة جديدة للـ PFE)
+        if ($request->filled('date')) {
+            try {
+                $date = $request->date;
+                // إذا أرسل المستخدم كلمات دلالية بدل تاريخ محدد
+                if ($date === 'today') {
+                    $query->whereDate('start_date', Carbon::today());
+                } elseif ($date === 'tomorrow') {
+                    $query->whereDate('start_date', Carbon::tomorrow());
+                } else {
+                    // فلترة حسب التاريخ المختار من الـ Date Picker
+                    $query->whereDate('start_date', Carbon::parse($date));
+                }
+            } catch (\Exception $e) {
+                // في حال كان تنسيق التاريخ خاطئاً، نتجاهل الفلترة
+            }
+        }
+
+        // 6. الترتيب (الأقرب تاريخاً يظهر أولاً)
         $query->orderBy('start_date', 'asc');
 
         // الترقيم (Pagination)
@@ -59,11 +77,11 @@ class EventController extends Controller
     }
 
     /**
-     * عرض تفاصيل فعالية واحدة (للزوار والمستخدمين)
+     * عرض تفاصيل فعالية واحدة (بما في ذلك التقييمات)
      */
     public function show(Event $event): JsonResponse
     {
-        // جلب الحدث مع التقييمات وأسماء أصحابها
+        // جلب العلاقات اللازمة لعرض صفحة التفاصيل والخريطة والتقييمات
         $event->load(['organizer', 'category', 'reviews.user:id,name']);
 
         return response()->json([
@@ -73,7 +91,7 @@ class EventController extends Controller
     }
 
     /**
-     * إنشاء فعالية جديدة (للمنظمين والآدمن فقط)
+     * إنشاء فعالية جديدة (للمنظمين والآدمن)
      */
     public function store(Request $request): JsonResponse
     {
@@ -95,35 +113,34 @@ class EventController extends Controller
 
         $data = $request->all();
 
-        // معالجة رفع الصورة وتخزينها في المجلد العام
+        // رفع الصورة وتخزينها
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('events', 'public');
             $data['image'] = $path;
         }
 
-        // إعداد البيانات التلقائية للمنظم
+        // بيانات المنظم والروابط
         $data['organizer_id'] = $request->user()->id;
         $data['slug'] = Str::slug($request->title) . '-' . Str::random(5);
         $data['is_free'] = ($request->price == 0);
-        $data['status'] = 'published'; // يتم النشر مباشرة
+        $data['status'] = 'published';
 
         $event = Event::create($data);
 
         return response()->json([
             'success' => true,
-            'message' => 'L\'événement a été créé et publié avec succès.',
+            'message' => 'L\'événement a été publié avec succès !',
             'data' => $event
         ], 201);
     }
 
     /**
-     * تحديث فعالية (لصاحب الفعالية أو الآدمن)
+     * تحديث فعالية (مع فحص الصلاحية)
      */
     public function update(Request $request, Event $event): JsonResponse
     {
-        // حماية برمجية لضمان أن المنظم يعدل أحداثه فقط
         if ($request->user()->id !== $event->organizer_id && $request->user()->role !== 'admin') {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
+            return response()->json(['success' => false, 'message' => 'Action non autorisée'], 403);
         }
 
         $event->update($request->all());
@@ -140,7 +157,6 @@ class EventController extends Controller
      */
     public function destroy(Event $event): JsonResponse
     {
-        // حذف الصورة المرتبطة من السيرفر لتوفير المساحة
         if ($event->image) {
             Storage::disk('public')->delete($event->image);
         }
@@ -149,7 +165,7 @@ class EventController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Événement supprimé avec succès.'
+            'message' => 'Événement supprimé'
         ]);
     }
 }

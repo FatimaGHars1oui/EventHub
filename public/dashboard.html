@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Dashboard | EventHub Fès</title>
+    <title>Tableau de Bord | EventHub Fès</title>
     
-    <!-- CSS Dependencies -->
+    <!-- CSS & Fonts -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- JS Dependencies (Charts, PDF, QR Scanner, Alerts) -->
+    <!-- JS Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
@@ -32,7 +32,7 @@
         
         .sidebar-header { padding: 30px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .nav-custom .nav-link { 
-            color: #94a3b8; padding: 12px 25px; margin: 5px 15px;
+            color: #94a3b8; padding: 12px 25px; margin: 4px 15px;
             border-radius: 12px; transition: 0.3s; display: flex; align-items: center;
         }
         .nav-custom .nav-link:hover, .nav-custom .nav-link.active { 
@@ -41,28 +41,32 @@
         .nav-custom .nav-link.active { background: var(--primary); box-shadow: 0 10px 15px -3px rgba(67, 97, 238, 0.3); }
         .nav-custom i { width: 28px; font-size: 1.1rem; }
 
+        /* Role-Based Badge */
+        #user-role-badge { font-size: 9px; letter-spacing: 1px; padding: 6px 12px; }
+
         /* KPI Cards */
         .stat-card { 
             border: none; border-radius: 24px; padding: 25px; 
             background: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
             border: 1px solid #f1f5f9; transition: 0.3s;
         }
-        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
         .icon-shape {
             width: 52px; height: 52px; border-radius: 16px;
             display: flex; align-items: center; justify-content: center; font-size: 22px;
         }
 
-        /* Charts & Tables */
-        .glass-card { background: white; border-radius: 24px; padding: 30px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; }
+        /* Logic Visibility */
+        .admin-only, .organizer-only, .user-only { display: none; }
+
+        /* Tables & Charts */
+        .glass-card { background: white; border-radius: 24px; padding: 30px; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
         .table-custom thead th { background: #f8fafc; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; color: var(--text-muted); padding: 15px; border: none; }
         .table-custom tbody td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
 
-        /* Scanner Feed */
-        #reader { border-radius: 20px; overflow: hidden; border: none !important; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        
-        /* PDF Ticket Template (Hidden) */
-        #ticket-to-print { background: white !important; color: black !important; width: 450px; margin: auto; border-radius: 20px; overflow: hidden; border: 2px dashed #ddd; }
+        /* Sections */
+        .dash-section { display: none; animation: fadeIn 0.4s ease; }
+        .dash-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         @media (max-width: 992px) {
             #sidebar { margin-left: -280px; }
@@ -73,41 +77,51 @@
 </head>
 <body class="show-sidebar">
 
-    <!-- Sidebar Navigation -->
+    <!-- SIDEBAR -->
     <aside id="sidebar">
         <div class="sidebar-header text-center">
             <h3 class="fw-bold m-0 text-white">Event<span class="text-primary">Hub</span></h3>
-            <div id="user-role-badge" class="badge bg-primary bg-opacity-10 text-primary mt-2 px-3 py-2 text-uppercase" style="font-size: 9px; letter-spacing: 1px;">Role</div>
+            <div id="user-role-badge" class="badge bg-primary bg-opacity-10 text-primary mt-2 text-uppercase">Role</div>
         </div>
         <div class="nav flex-column nav-custom mt-4">
-            <a class="nav-link active" href="#" onclick="dash.showTab('overview')"><i class="fas fa-th-large"></i> Vue d'ensemble</a>
-            <a class="nav-link" id="link-events" href="#" onclick="dash.showTab('events')"><i class="fas fa-calendar-alt"></i> Mes Événements</a>
-            <a class="nav-link" id="link-bookings" href="#" onclick="dash.showTab('bookings')"><i class="fas fa-ticket-alt"></i> Mes Réservations</a>
-            <a class="nav-link" id="link-scanner" href="#" onclick="dash.showTab('scanner')"><i class="fas fa-camera"></i> Scanner Tickets</a>
-            <hr class="mx-4 opacity-5 border-white">
+            <a class="nav-link active" href="#" onclick="dashManager.showSection('overview')"><i class="fas fa-th-large"></i> Vue d'ensemble</a>
+            
+            <!-- Admin Sections -->
+            <a class="nav-link admin-only" id="nav-val" href="#" onclick="dashManager.showSection('validation')"><i class="fas fa-check-circle"></i> Validations</a>
+            <a class="nav-link admin-only" id="nav-users" href="#" onclick="dashManager.showSection('users')"><i class="fas fa-users"></i> Utilisateurs</a>
+            
+            <!-- Organizer/Admin Sections -->
+            <a class="nav-link admin-only organizer-only" id="link-events" href="#" onclick="dashManager.showSection('events')"><i class="fas fa-calendar-alt"></i> Mes Événements</a>
+            <a class="nav-link admin-only organizer-only" id="link-scanner" href="#" onclick="dashManager.showSection('scanner')"><i class="fas fa-camera"></i> Scanner QR</a>
+            
+            <!-- User Section -->
+            <a class="nav-link user-only" id="link-my-bookings" href="#" onclick="dashManager.showSection('bookings')"><i class="fas fa-ticket-alt"></i> Mes Réservations</a>
+            
+            <hr class="mx-4 opacity-10 border-white">
             <a class="nav-link text-warning" href="index.html"><i class="fas fa-external-link-alt"></i> Retour au site</a>
             <a class="nav-link text-danger" href="#" onclick="auth.logout()"><i class="fas fa-power-off"></i> Déconnexion</a>
         </div>
     </aside>
 
-    <!-- Main Content Area -->
+    <!-- MAIN CONTENT -->
     <main id="main-wrapper">
         <header class="d-flex justify-content-between align-items-center mb-5">
             <button class="btn btn-white shadow-sm rounded-3 d-lg-none me-3" onclick="document.body.classList.toggle('show-sidebar')">
                 <i class="fas fa-bars"></i>
             </button>
             <div>
-                <h2 id="tab-title" class="fw-bold m-0">Tableau de Bord</h2>
-                <p class="text-muted small m-0">Suivi en temps réel de vos activités.</p>
+                <h2 id="section-title" class="fw-bold m-0">Dashboard</h2>
+                <p class="text-muted small m-0">Espace <span id="display-role">Utilisateur</span></p>
             </div>
             <div class="d-flex align-items-center bg-white p-2 pe-3 rounded-pill shadow-sm border">
-                <img id="user-avatar" src="" class="rounded-circle me-2" width="38" height="38">
-                <span id="user-name" class="fw-bold small text-dark">...</span>
+                <img id="user-avatar" src="" class="rounded-circle me-2 border" width="38" height="38">
+                <span id="user-name" class="fw-bold small text-dark">Chargement...</span>
             </div>
         </header>
 
-        <!-- TAB: OVERVIEW -->
-        <div id="tab-overview" class="dash-tab">
+        <!-- SECTION: OVERVIEW -->
+        <div id="section-overview" class="dash-section active">
+            <!-- KPI Row -->
             <div class="row g-4 mb-5">
                 <div class="col-md-4">
                     <div class="stat-card d-flex align-items-center">
@@ -118,7 +132,7 @@
                 <div class="col-md-4">
                     <div class="stat-card d-flex align-items-center">
                         <div class="icon-shape bg-success bg-opacity-10 text-success me-3"><i class="fas fa-wallet"></i></div>
-                        <div><p class="text-muted mb-0 small">Chiffre d'Affaires</p><h3 id="stat-count-2" class="fw-bold m-0">0 MAD</h3></div>
+                        <div><p class="text-muted mb-0 small" id="stat-label-2">Dépenses</p><h3 id="stat-count-2" class="fw-bold m-0">0 MAD</h3></div>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -129,32 +143,30 @@
                 </div>
             </div>
 
-            <!-- Admin/Organizer Charts -->
-            <div id="admin-charts" class="row g-4">
-                <div class="col-lg-8">
-                    <div class="glass-card h-100">
-                        <h5 class="fw-bold mb-4">Événements les plus populaires</h5>
-                        <canvas id="barChart" height="300"></canvas>
-                    </div>
-                </div>
-                <div class="col-lg-4">
-                    <div class="glass-card h-100">
-                        <h5 class="fw-bold mb-4 text-center">Par Catégorie</h5>
-                        <canvas id="pieChart" height="300"></canvas>
-                    </div>
-                </div>
+            <!-- Charts (Visible only for Admin) -->
+            <div id="admin-charts" class="row g-4 admin-only">
+                <div class="col-lg-8"><div class="glass-card"><h5>Analytique des ventes</h5><canvas id="barChart" height="300"></canvas></div></div>
+                <div class="col-lg-4"><div class="glass-card"><h5>Top Catégories</h5><canvas id="pieChart" height="300"></canvas></div></div>
             </div>
+
+            <!-- User Bookings Summary (Visible for Standard User) -->
+             <div class="user-only mt-4">
+                <div class="glass-card">
+                    <h5 class="fw-bold mb-4">Activités Récentes</h5>
+                    <p class="text-muted small">Retrouvez vos dernières réservations dans l'onglet "Mes Réservations".</p>
+                    <button class="btn btn-primary rounded-pill px-4" onclick="dashManager.showSection('bookings')">Voir mes billets</button>
+                </div>
+             </div>
         </div>
 
-        <!-- TAB: DATA TABLE (Bookings/Events) -->
-        <div id="tab-data" class="dash-tab mt-4" style="display: none;">
+        <!-- SECTION: DATA TABLES (Users/Events/Bookings) -->
+        <div id="section-data" class="dash-section">
             <div class="glass-card p-0 overflow-hidden">
                 <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
                     <h5 id="table-title" class="fw-bold m-0 text-primary">Liste des données</h5>
-                    <button class="btn btn-primary btn-sm rounded-pill px-3" onclick="dash.loadOverview()">Actualiser <i class="fas fa-sync-alt ms-1"></i></button>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-custom m-0">
+                    <table class="table table-custom m-0 align-middle">
                         <thead id="table-head"></thead>
                         <tbody id="table-body"></tbody>
                     </table>
@@ -162,51 +174,50 @@
             </div>
         </div>
 
-        <!-- TAB: SCANNER -->
-        <div id="tab-scanner" class="dash-tab mt-4" style="display: none;">
-            <div class="glass-card text-center py-5">
-                <div class="mb-4">
-                    <i class="fas fa-qrcode text-primary display-4 mb-3"></i>
-                    <h4 class="fw-bold">Contrôle d'accès</h4>
-                    <p class="text-muted">Scannez le QR Code présent sur le billet du visiteur.</p>
+        <!-- SECTION: VALIDATION -->
+        <div id="section-validation" class="dash-section">
+            <div class="glass-card p-0 overflow-hidden">
+                <div class="p-4 border-bottom bg-warning bg-opacity-10 text-warning-emphasis"><h5 class="fw-bold m-0">Approbation des événements</h5></div>
+                <div class="table-responsive">
+                    <table class="table table-custom m-0 align-middle">
+                        <thead><tr><th>Événement</th><th>Organisateur</th><th>Date</th><th>Actions</th></tr></thead>
+                        <tbody id="pending-events-table"></tbody>
+                    </table>
                 </div>
-                <!-- Camera Feed -->
-                <div id="reader" style="max-width: 500px; margin: auto;"></div>
-                <div class="mt-4">
-                    <button class="btn btn-outline-danger rounded-pill px-4" onclick="dash.stopScanner()">
-                        <i class="fas fa-stop me-2"></i> Arrêter le scanner
-                    </button>
-                </div>
+            </div>
+        </div>
+
+        <!-- SECTION: SCANNER -->
+        <div id="tab-scanner" class="dash-section text-center">
+            <div class="glass-card mx-auto shadow-lg" style="max-width: 600px;">
+                <h4 class="fw-bold mb-4 text-primary"><i class="fas fa-qrcode me-2"></i>Scanner de Contrôle</h4>
+                <div id="reader" class="rounded-4 overflow-hidden border"></div>
+                <button class="btn btn-danger mt-4 rounded-pill px-5 fw-bold" onclick="dashManager.stopScanner()">Arrêter la caméra</button>
             </div>
         </div>
     </main>
 
-    <!-- MODAL: View Ticket -->
+    <!-- MODAL: Ticket View -->
     <div class="modal fade" id="ticketModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 bg-transparent">
                 <div class="modal-body p-0">
-                    <!-- Ticket UI -->
-                    <div id="ticket-to-print">
-                        <div class="bg-primary text-white p-4 text-center">
-                            <h4 class="m-0 fw-bold">EVENTHUB TICKET</h4>
-                            <p id="ticket-event-title" class="m-0 small opacity-75"></p>
+                    <div id="ticket-to-print" class="bg-white shadow-2xl">
+                        <div class="ticket-header text-center">
+                            <h4 class="m-0 fw-bold">BILLET OFFICIEL</h4>
+                            <p id="ticket-event-title" class="m-0 small opacity-75 mt-1"></p>
                         </div>
-                        <div class="p-4 text-center bg-white">
-                            <div id="ticket-qrcode" class="mb-4 d-inline-block p-3 border rounded shadow-sm"></div>
+                        <div class="p-5 text-center bg-white text-dark">
+                            <div id="ticket-qrcode" class="mb-4 d-inline-block p-3 border rounded-4 bg-light shadow-sm"></div>
                             <h5 id="ticket-number" class="fw-bold text-primary mb-4"></h5>
-                            <hr>
-                            <div class="row text-start mt-3 px-2">
-                                <div class="col-6"><small class="text-muted d-block">Nom du Participant</small><span id="ticket-user" class="fw-bold"></span></div>
-                                <div class="col-6 text-end"><small class="text-muted d-block">Date Event</small><span id="ticket-date" class="fw-bold"></span></div>
+                            <div class="row text-start mt-4 border-top pt-3">
+                                <div class="col-6"><small class="text-muted d-block uppercase" style="font-size:10px">Participant</small><span id="ticket-user" class="fw-bold small"></span></div>
+                                <div class="col-6 text-end"><small class="text-muted d-block uppercase" style="font-size:10px">Date Event</small><span id="ticket-date" class="fw-bold small"></span></div>
                             </div>
                         </div>
                     </div>
-                    <!-- Actions -->
                     <div class="text-center mt-4">
-                        <button onclick="bookingFlow.downloadPDF()" class="btn btn-warning rounded-pill px-4 fw-bold shadow me-2">
-                            <i class="fas fa-file-pdf me-2"></i>Télécharger PDF
-                        </button>
+                        <button onclick="bookingFlow.downloadPDF()" class="btn btn-warning rounded-pill px-5 fw-bold shadow-lg me-2 text-dark"><i class="fas fa-file-pdf me-2"></i>PDF</button>
                         <button class="btn btn-light rounded-pill px-4 shadow" data-bs-dismiss="modal">Fermer</button>
                     </div>
                 </div>
@@ -214,8 +225,6 @@
         </div>
     </div>
 
-    <!-- Scripts Logic -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/app.js"></script>
     <script src="js/dashboard.js"></script>
 </body>

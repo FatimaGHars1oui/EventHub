@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\Category;
+use Illuminate\Support\Str;
 
 class CategorySeeder extends Seeder
 {
@@ -14,90 +15,67 @@ class CategorySeeder extends Seeder
     {
         $categories = [
             [
-                'name' => 'Technology',
-                'slug' => 'technology',
-                'description' => 'Explore the latest trends and innovations in technology with our curated selection of tech events.',
-                'color' => '#007BFF',
-                'icon' => 'fa-solid fa-microchip',
-                'is_active' => true,
+                'name' => 'Technologie',
+                'description' => 'Conférences tech, hackathons et innovations numériques.',
+                'color' => '#4361ee', // Indigo
+                'icon' => 'fas fa-microchip',
             ],
             [
-                'name' => 'Music',
-                'slug' => 'music',
-                'description' => 'Discover a world of music events, from intimate concerts to large festivals, across various genres.',
-                'color' => '#28A745',
-                'icon' => 'fa-solid fa-music',
-                'is_active' => true,
+                'name' => 'Musique',
+                'description' => 'Concerts, festivals et soirées musicales à Fès.',
+                'color' => '#f72585', // Pink
+                'icon' => 'fas fa-music',
             ],
             [
-                'name' => 'Art',
-                'slug' => 'art',
-                'description' => 'Immerse yourself in the vibrant art scene with exhibitions, galleries, and creative workshops.',
-                'color' => '#DC3545',
-                'icon' => 'fa-solid fa-palette',
-                'is_active' => true,
+                'name' => 'Art & Culture',
+                'description' => 'Expositions, galeries d\'art et patrimoine culturel.',
+                'color' => '#ffb703', // Orange/Gold
+                'icon' => 'fas fa-palette',
             ],
             [
-                'name' =>'Crafts',
-                'slug' => 'crafts',
-                'description' => 'Explore the world of crafts with workshops, fairs, and exhibitions showcasing handmade creations.',
-                'color' => '#FFC107',
-                'icon' => 'fa-solid fa-hand-sparkles',
-                'is_active' => true,
+                'name' => 'Sport & Fitness',
+                'description' => 'Marathons, tournois et séances de bien-être.',
+                'color' => '#4cc9f0', // Sky Blue
+                'icon' => 'fas fa-running',
             ],
             [
-                'name' => 'Sports',
-                'slug' => 'sports',
-                'description' => 'Get active with our selection of sports events, from local matches to international tournaments.',
-                'color' => '#17A2B8',
-                'icon' => 'fa-solid fa-basketball',
-                'is_active' => true,
+                'name' => 'Gastronomie',
+                'description' => 'Dégustations, cours de cuisine et festivals culinaires.',
+                'color' => '#fb8500', // Deep Orange
+                'icon' => 'fas fa-utensils',
             ],
-             [
-                'name' => 'Food & Drink',
-                'slug' => 'food-drink',
-                'description' => 'Savor the flavors of our food and drink events, featuring tastings, festivals, and culinary workshops.',
-                'color' => '#E83E8C',
-                'icon' => 'fa-solid fa-utensils',
-                'is_active' => true,
+            [
+                'name' => 'Business',
+                'description' => 'Networking, séminaires et opportunités professionnelles.',
+                'color' => '#0f172a', // Dark Slate
+                'icon' => 'fas fa-briefcase',
             ],
-             [
-                'name' => 'Health & Wellness',
-                'slug' => 'health-wellness',
-                'description' => 'Prioritize your well-being with our health and wellness events, including fitness classes, retreats, and seminars.',
-                'color' => '#20C997',
-                'icon' => 'fa-solid fa-heart-pulse',
-                'is_active' => true,
+            [
+                'name' => 'Éducation',
+                'description' => 'Ateliers d\'apprentissage, cours et formations.',
+                'color' => '#7209b7', // Purple
+                'icon' => 'fas fa-graduation-cap',
             ],
-             [
-                'name' => 'Education',
-                'slug' => 'education',
-                'description' => 'Expand your knowledge with our education events, featuring workshops, lectures, and conferences on various topics.',
-                'color' => '#6F42C1',
-                'icon' => 'fa-solid fa-graduation-cap',
-                'is_active' => true,
-            ],
-             [
-                'name' => 'Business & Networking',
-                'slug' => 'business-networking',
-                'description' => 'Connect with professionals and grow your network at our business and networking events, including conferences, meetups, and workshops.',
-                'color' => '#343A40',
-                'icon' => 'fa-solid fa-briefcase',
-                'is_active' => true,
-            ],
-             [
-                'name' => 'Film',
-                'slug' => 'film-theater',
-                'description' => 'Experience the magic of cinema and live performances with our film and theater events, including screenings, festivals, and plays.',
-                'color' => '#FD7E14',
-                'icon' => 'fa-solid fa-film',
-                'is_active' => true,
-            ],
+            [
+                'name' => 'Santé',
+                'description' => 'Yoga, séminaires médicaux et bien-être mental.',
+                'color' => '#2ec4b6', // Teal
+                'icon' => 'fas fa-heartbeat',
+            ]
         ];
 
-        foreach ($categories as $category) {
-            \App\Models\Category::create($category);
+        foreach ($categories as $cat) {
+            // استخدام updateOrCreate يمنع خطأ التكرار (Duplicate Entry)
+            Category::updateOrCreate(
+                ['slug' => Str::slug($cat['name'])], // يبحث عن الصنف بواسطة الـ slug
+                [
+                    'name' => $cat['name'],
+                    'description' => $cat['description'],
+                    'color' => $cat['color'],
+                    'icon' => $cat['icon'],
+                    'is_active' => true,
+                ]
+            );
         }
-
     }
 }

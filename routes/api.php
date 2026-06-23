@@ -1,30 +1,36 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ReviewController;
-use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| API Routes - EventHub Project
+|--------------------------------------------------------------------------
+*/
 
 /*
 |--------------------------------------------------------------------------
 | 1. المسارات العامة (Public Routes)
-| لا تحتاج إلى تسجيل دخول - متاحة للزوار
+| متاحة للزوار بدون تسجيل دخول - تمنع خطأ 401 في الصفحة الرئيسية
 |--------------------------------------------------------------------------
 */
 
-// عرض الفعاليات (البحث، الفلترة، الترقيم)
+// الفعاليات (البحث النصي + الفلترة بالتاريخ + الترقيم)
 Route::get('/events', [EventController::class, 'index']);
 
-// عرض تفاصيل فعالية واحدة (بما في ذلك التقييمات والخرائط)
+// تفاصيل فعالية محددة (للمودال + الخريطة + التقييمات)
 Route::get('/events/{event}', [EventController::class, 'show']);
 
-// عرض قائمة الأصناف (لفلترة البحث)
+// قائمة الأصناف (لعرض الأزرار في الواجهة)
 Route::get('/categories', [CategoryController::class, 'index']);
 
-// نظام المصادقة الأساسي
+// تسجيل حساب جديد ودخول
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -32,31 +38,57 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 /*
 |--------------------------------------------------------------------------
 | 2. المسارات المحمية (Protected Routes)
-| تحتاج إلى Token صالح (Authorization: Bearer {token})
+| تتطلب ترويسة (Authorization: Bearer {token})
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->group(function () {
-    
-    // --- الملف الشخصي ---
+
+    // --- الحساب الشخصي ---
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 
-    // --- نظام الحجز والتذاكر ---
-    Route::post('/bookings', [BookingController::class, 'store']); // حجز جديد
-    Route::get('/my-bookings', [BookingController::class, 'myBookings']); // قائمة حجوزاتي
-    Route::get('/bookings/ticket/{booking_number}', [BookingController::class, 'getTicketData']); // بيانات التذكرة والـ QR
+    // --- نظام الحجز والتذاكر (للمستخدمين) ---
+    Route::post('/bookings', [BookingController::class, 'store']);                 // حجز مكان (مجاني/مدفوع)
+    Route::get('/my-bookings', [BookingController::class, 'myBookings']);          // رؤية حجوزاتي
+    Route::get('/bookings/ticket/{booking_number}', [BookingController::class, 'getTicketData']); // بيانات الـ QR والـ PDF
 
-    // --- نظام التقييم والمراجعات ---
+    // --- نظام التقييم (Reviews) ---
     Route::post('/reviews', [ReviewController::class, 'store']); // إضافة تقييم بالنجوم
 
-    // --- نظام التحقق Scanner (للمنظم والآدمن فقط) ---
-    Route::post('/bookings/check-in', [BookingController::class, 'checkIn']);
+    /*
+    |--------------------------------------------------------------------------
+    | 3. مسارات المنظمين والإدارة (Organizer & Admin)
+    | تعتمد على Middleware الأدوار (Role Middleware)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('role:admin,organizer')->group(function () {
+        
+        // إدارة الفعاليات (نشر، تعديل، حذف)
+        Route::post('/events', [EventController::class, 'store']);         // إضافة فعالية مع صورة
+        Route::put('/events/{event}', [EventController::class, 'update']); // تعديل بيانات
+        Route::delete('/events/{event}', [EventController::class, 'destroy']); // حذف
 
-    // --- إدارة الفعاليات (للمنظم والآدمن) ---
-    Route::post('/events', [EventController::class, 'store']); // إنشاء فعالية جديدة
-    Route::put('/events/{event}', [EventController::class, 'update']); // تحديث
-    Route::delete('/events/{event}', [EventController::class, 'destroy']); // حذف
+        // نظام التحقق Scanner (مسح QR Code عند الباب)
+        Route::post('/bookings/check-in', [BookingController::class, 'checkIn']);
+    });
 
-    // --- إحصائيات لوحة التحكم (Dashboard Stats) ---
-    Route::get('/admin/stats', [AdminController::class, 'getStats']);
+    /*
+    |--------------------------------------------------------------------------
+    | 4. مسارات الإدارة العليا فقط (Admin Only)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('role:admin')->group(function () {
+        
+        // إحصائيات لوحة التحكم (Charts, Revenues, Active Users)
+        Route::get('/admin/stats', [AdminController::class, 'getStats']);
+        
+        // إدارة المستخدمين (عرض وحذف)
+        Route::get('/admin/users', [AdminController::class, 'usersIndex']);
+        Route::delete('/admin/users/{user}', [AdminController::class, 'deleteUser']);
+        
+        // إدارة التصنيفات (CRUD)
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
+    });
+
 });

@@ -13,36 +13,52 @@ return new class extends Migration
     {
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
-           
-            $table->string('booking_number')->unique();//BK-20240415-0001
+
+            // --- المعرفات الفريدة ---
+            // رقم الحجز (مثال: BK-2024-X89Z) وهو الذي يتحول لـ QR Code
+            $table->string('booking_number')->unique();
+
+            // --- العلاقات ---
+            // المستخدم الذي قام بالحجز
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            // الفعالية المحجوزة
             $table->foreignId('event_id')->constrained()->onDelete('cascade');
 
-            //détails de la réservation
-            $table->integer('quantity')->default(1);
-            $table->decimal('unit_price', 8, 2);
-            $table->decimal('total_amount', 8, 2);
+            // --- تفاصيل الحجز ---
+            $table->integer('quantity')->default(1); // عدد التذاكر
+            $table->decimal('unit_price', 10, 2); // سعر التذكرة الواحدة وقت الحجز
+            $table->decimal('total_amount', 10, 2); // المبلغ الإجمالي (سعر الوحدة × الكمية)
             $table->string('currency', 3)->default('MAD');
 
-            //Informations de participant
+            // --- معلومات الحاضر (Attendee Info) ---
+            // قد يحجز شخص لآخر، لذا نخزن بيانات الحاضر المستفيد من التذكرة
             $table->string('attendee_name');
             $table->string('attendee_email');
             $table->string('attendee_phone')->nullable();
-            $table->text('special_requirements')->nullable();
+            $table->text('special_requirements')->nullable(); // متطلبات خاصة (اختياري)
 
-            //Statut de la réservation
-            $table->enum('status', ['pending', 'confirmed', 'cancelled','refunded'])->default('pending');
-            $table->enum('payment_status', ['pending', 'paid', 'failed','refunded'])->default('pending');
-            $table->string('payment_method')->nullable();
-            $table->string('payment_reference')->nullable();
+            // --- حالات الحجز (Workflow Status) ---
+            // pending: في انتظار الدفع أو الموافقة
+            // confirmed: حجز مؤكد (تذكرة صالحة)
+            // canceled: حجز ملغى
+            // attended: المستخدم حضر الفعالية وتم مسح تذكرته عند الباب (Check-in)
+            $table->enum('status', ['pending', 'confirmed', 'canceled', 'attended'])
+                  ->default('pending');
 
-            //Dates importantes
-            $table->timestamp('confirmed_at')->nullable();
-            $table->timestamp('cancelled_at')->nullable();
-            $table->timestamp('refunded_at')->nullable();
+            // --- حالات الدفع (Payment Status) ---
+            $table->enum('payment_status', ['pending', 'paid', 'failed', 'refunded'])
+                  ->default('pending');
+            
+            $table->string('payment_method')->nullable(); // (Card, PayPal, Cash)
+            $table->string('payment_reference')->nullable(); // رقم المعاملة البنكية
 
-            $table->timestamps();
-            //Index pour optimiser les recherches
+            // --- التوقيتات الهامة ---
+            $table->timestamp('confirmed_at')->nullable(); // متى تم تأكيد الحجز
+            $table->timestamp('canceled_at')->nullable();  // متى تم الإلغاء
+            $table->timestamps(); // (created_at = تاريخ الطلب)
+
+            // --- الفهارس لسرعة البحث والإحصائيات ---
+            $table->index('booking_number');
             $table->index(['user_id', 'status']);
             $table->index(['event_id', 'status']);
         });
