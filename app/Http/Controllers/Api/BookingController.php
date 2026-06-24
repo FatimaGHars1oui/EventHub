@@ -98,7 +98,7 @@ class BookingController extends Controller
     /**
      * جلب بيانات التذكرة مع الـ QR Code
      */
-    public function getTicketData($booking_number): JsonResponse
+    public function getTicketData(string $booking_number): JsonResponse
     {
         $booking = Booking::with(['event', 'user'])
             ->where('booking_number', $booking_number)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\User;
 use App\Models\Event;
 use App\Mail\BookingConfirmation;
 use Illuminate\Http\JsonResponse;
@@ -12,12 +13,69 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Exception;
 
-class BookingController extends Controller
+class AuthController extends Controller
 {
+
+// 1. دالة تسجيل الدخول (المفقودة الحالية)
+    public function login(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        if (!Auth::attempt($credentials)) {
+            return response()->json([
+                'message' => 'البيانات المدخلة غير صحيحة'
+            ], 401);
+        }
+
+        $user = Auth::user();
+        // إذا كانت طريقة createToken متاحة (مثل عند استخدام Sanctum)
+        if (method_exists($user, 'createToken')) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+        } else {
+            // بديل بسيط عندما لا تكون الحزمة متوفرة: إنشاء توكن عشوائي مؤقت
+            $token = bin2hex(random_bytes(40));
+        }
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token
+        ], 200);
+    }
+
+    // 2. دالة إنشاء حساب جديد (تأكدي من وجودها أيضاً)
+    public function register(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:6',
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        if (method_exists($user, 'createToken')) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+        } else {
+            $token = bin2hex(random_bytes(40));
+        }
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token
+        ], 201);
+    }
     /**
      * جلب حجوزات المستخدم الحالي (History)
      */

@@ -1,12 +1,12 @@
 /**
- * EventHub Fès - Système de Gestion d'Événements
+ * EventHub Fès - نظام إدارة الأحداث
  * Version: 2.0.0 - Premium Edition
  */
 
-// ============ Configuration de l'API ============
+// ============ API Configuration ============
 const API_URL = "http://localhost:8000/api";
 
-// ============ État Global ============
+// ============ Global State ============
 const state = {
     token: localStorage.getItem('token'),
     user: JSON.parse(localStorage.getItem('user') || 'null'),
@@ -15,7 +15,7 @@ const state = {
     categories: []
 };
 
-// ============ Assistant API ============
+// ============ API Helper ============
 const api = {
     headers() {
         const h = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
@@ -35,20 +35,20 @@ const api = {
             }
             return await response.json();
         } catch (error) {
-            console.error("Erreur API:", error);
-            return { success: false, message: "Erreur de connexion au serveur" };
+            console.error("API Error:", error);
+            return { success: false, message: "خطأ في الاتصال بالخادم" };
         }
     }
 };
 
-// ============ Authentification ============
+// ============ Authentication ============
 const auth = {
     async login() {
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
 
         if (!email || !password) {
-            Swal.fire('Attention', 'Veuillez remplir tous les champs', 'warning');
+            Swal.fire('تنبيه', 'يرجى ملء جميع الحقول', 'warning');
             return;
         }
 
@@ -64,9 +64,9 @@ const auth = {
             bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();
             document.getElementById('login-form').reset();
             
-            Swal.fire('Succès', 'Connexion réussie', 'success');
+            Swal.fire('نجح', 'تم تسجيل الدخول بنجاح', 'success');
         } else {
-            Swal.fire('Erreur', res.message || 'Identifiants incorrects', 'error');
+            Swal.fire('خطأ', res.message || 'بيانات الدخول غير صحيحة', 'error');
         }
     },
 
@@ -76,7 +76,7 @@ const auth = {
         const password = document.getElementById('register-password').value;
 
         if (!name || !email || !password || password.length < 8) {
-            Swal.fire('Attention', 'Veuillez vérifier les données (le mot de passe doit contenir au moins 8 caractères)', 'warning');
+            Swal.fire('تنبيه', 'يرجى التحقق من البيانات (كلمة المرور 8 أحرف على الأقل)', 'warning');
             return;
         }
 
@@ -94,9 +94,9 @@ const auth = {
             bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
             document.getElementById('register-form').reset();
             
-            Swal.fire('Bienvenue', 'Votre compte a été créé avec succès', 'success');
+            Swal.fire('مرحبا', 'تم إنشاء حسابك بنجاح', 'success');
         } else {
-            Swal.fire('Erreur', res.message || 'Échec de la création du compte', 'error');
+            Swal.fire('خطأ', res.message || 'فشل في إنشاء الحساب', 'error');
         }
     },
 
@@ -105,13 +105,13 @@ const auth = {
         state.token = null;
         state.user = null;
         ui.updateAuthUI();
-        Swal.fire('Déconnexion', 'Vous avez été déconnecté avec succès', 'success').then(() => {
+        Swal.fire('تسجيل خروج', 'تم تسجيل خروجك بنجاح', 'success').then(() => {
             location.reload();
         });
     }
 };
 
-// ============ Gestion des Événements ============
+// ============ Events Management ============
 const events = {
     async getAll() {
         const res = await api.request('/events');
@@ -145,11 +145,11 @@ const events = {
     }
 };
 
-// ============ Système de Réservation ============
+// ============ Booking System ============
 const booking = {
     async book(eventId) {
         if (!state.token) {
-            Swal.fire('Attention', 'Veuillez d\'abord vous connecter', 'warning');
+            Swal.fire('تنبيه', 'يرجى تسجيل الدخول أولاً', 'warning');
             new bootstrap.Modal(document.getElementById('loginModal')).show();
             return;
         }
@@ -162,10 +162,10 @@ const booking = {
         });
 
         if (res.success) {
-            Swal.fire('Succès', 'Billet réservé avec succès', 'success');
+            Swal.fire('نجح', 'تم حجز التذكرة بنجاح', 'success');
             this.showTicket(res.booking);
         } else {
-            Swal.fire('Erreur', res.message || 'Échec de la réservation', 'error');
+            Swal.fire('خطأ', res.message || 'فشل الحجز', 'error');
         }
     },
 
@@ -173,18 +173,18 @@ const booking = {
         const qrCode = bookingData.qr_code ? `<div>${bookingData.qr_code}</div>` : '';
         
         Swal.fire({
-            title: 'Votre billet est prêt !',
+            title: 'تذكرتك جاهزة!',
             html: `
                 <div class="p-4 text-center">
                     <h5 class="mb-3">${bookingData.event.title}</h5>
                     ${qrCode}
-                    <p class="mt-3"><strong>N° Réservation:</strong> ${bookingData.booking_number}</p>
-                    <p><strong>Nom:</strong> ${bookingData.attendee_name}</p>
-                    <p><strong>Date:</strong> ${new Date(bookingData.event.start_date).toLocaleDateString('fr-FR')}</p>
+                    <p class="mt-3"><strong>رقم الحجز:</strong> ${bookingData.booking_number}</p>
+                    <p><strong>الاسم:</strong> ${bookingData.attendee_name}</p>
+                    <p><strong>التاريخ:</strong> ${new Date(bookingData.event.start_date).toLocaleDateString('ar-SA')}</p>
                 </div>
             `,
-            confirmButtonText: 'Télécharger PDF',
-            cancelButtonText: 'Fermer'
+            confirmButtonText: 'تحميل PDF',
+            cancelButtonText: 'إغلاق'
         }).then((result) => {
             if (result.isConfirmed) {
                 this.downloadPDF(bookingData);
@@ -197,11 +197,11 @@ const booking = {
             <div style="text-align: center; padding: 20px; border: 2px dashed #ccc; border-radius: 10px;">
                 <h2>EventHub Fès</h2>
                 <h3>${bookingData.event.title}</h3>
-                <p><strong>N° Réservation:</strong> ${bookingData.booking_number}</p>
-                <p><strong>Nom:</strong> ${bookingData.attendee_name}</p>
-                <p><strong>Email:</strong> ${bookingData.attendee_email}</p>
-                <p><strong>Date:</strong> ${new Date(bookingData.event.start_date).toLocaleDateString('fr-FR')}</p>
-                <p><strong>Lieu:</strong> ${bookingData.event.venue_address}</p>
+                <p><strong>رقم الحجز:</strong> ${bookingData.booking_number}</p>
+                <p><strong>الاسم:</strong> ${bookingData.attendee_name}</p>
+                <p><strong>البريد:</strong> ${bookingData.attendee_email}</p>
+                <p><strong>التاريخ:</strong> ${new Date(bookingData.event.start_date).toLocaleDateString('ar-SA')}</p>
+                <p><strong>الموقع:</strong> ${bookingData.event.venue_address}</p>
             </div>
         `;
 
@@ -217,7 +217,7 @@ const booking = {
     }
 };
 
-// ============ Gestion de l'Interface (UI) ============
+// ============ UI Management ============
 const ui = {
     renderEvents(eventsList) {
         const container = document.getElementById('events-container');
@@ -231,8 +231,8 @@ const ui = {
             container.innerHTML = `
                 <div class="col-12 text-center py-5">
                     <i class="fas fa-inbox" style="font-size: 4rem; color: #cbd5e1; margin-bottom: 20px; display: block;"></i>
-                    <h4 class="text-muted">Aucun événement trouvé</h4>
-                    <p class="text-muted">Essayez de rechercher avec d'autres mots-clés</p>
+                    <h4 class="text-muted">لم نجد أحداث</h4>
+                    <p class="text-muted">جرب البحث برموز أخرى</p>
                 </div>
             `;
             return;
@@ -245,8 +245,8 @@ const ui = {
     createEventCard(event) {
         const date = new Date(event.start_date);
         const day = date.getDate();
-        const month = date.toLocaleDateString('fr-FR', { month: 'short' });
-        const formattedPrice = event.price === 0 ? 'Gratuit' : `${event.price} DH`;
+        const month = date.toLocaleDateString('ar-SA', { month: 'short' });
+        const formattedPrice = event.price === 0 ? 'مجاني' : `${event.price} درهم`;
 
         return `
             <div class="col-lg-4 col-md-6" data-aos="fade-up">
@@ -257,13 +257,13 @@ const ui = {
                             <span class="day">${day}</span>
                             <span class="month">${month}</span>
                         </div>
-                        <div class="category-badge">${event.category?.name || 'Événement'}</div>
+                        <div class="category-badge">${event.category?.name || 'حدث'}</div>
                     </div>
                     <div class="card-body">
                         <h5 class="card-title">${event.title}</h5>
                         <p class="card-location">
                             <i class="fas fa-map-marker-alt"></i>
-                            ${event.venue_address || 'Fès'}
+                            ${event.venue_address || 'فاس'}
                         </p>
                         <div class="card-footer">
                             <span class="price-badge">${formattedPrice}</span>
@@ -288,10 +288,10 @@ const ui = {
                         <i class="fas fa-user-circle me-2"></i>${state.user.name}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="dashboard.html"><i class="fas fa-tachometer-alt me-2"></i>Tableau de bord</a></li>
+                        <li><a class="dropdown-item" href="dashboard.html"><i class="fas fa-tachometer-alt me-2"></i>لوحة التحكم</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item text-danger" href="#" onclick="auth.logout(); return false;">
-                            <i class="fas fa-sign-out-alt me-2"></i>Déconnexion
+                            <i class="fas fa-sign-out-alt me-2"></i>تسجيل خروج
                         </a></li>
                     </ul>
                 </div>
@@ -299,10 +299,10 @@ const ui = {
         } else {
             authButtons.innerHTML = `
                 <button class="btn btn-primary btn-sm me-2" data-bs-toggle="modal" data-bs-target="#loginModal">
-                    <i class="fas fa-sign-in-alt me-2"></i>Connexion
+                    <i class="fas fa-sign-in-alt me-2"></i>دخول
                 </button>
                 <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#registerModal">
-                    <i class="fas fa-user-plus me-2"></i>Inscription
+                    <i class="fas fa-user-plus me-2"></i>تسجيل
                 </button>
             `;
         }
@@ -314,7 +314,7 @@ const ui = {
             state.categories = res.data;
             const nav = document.getElementById('categories-nav');
             if (nav) {
-                nav.innerHTML = `<div class="category-pill active" onclick="filterByCategory('all', this)">Tout</div>` +
+                nav.innerHTML = `<div class="category-pill active" onclick="filterByCategory('all', this)">الكل</div>` +
                     res.data.map(cat => `
                         <div class="category-pill" onclick="filterByCategory(${cat.id}, this)">
                             <i class="fas fa-${this.getCategoryIcon(cat.name)}"></i> ${cat.name}
@@ -326,18 +326,18 @@ const ui = {
 
     getCategoryIcon(categoryName) {
         const icons = {
-            'Art': 'palette',
-            'Musique': 'music',
-            'Sport': 'futbol',
-            'Technologie': 'laptop',
-            'Éducation': 'graduation-cap',
-            'Autre': 'calendar'
+            'فن': 'palette',
+            'موسيقى': 'music',
+            'رياضة': 'futbol',
+            'تكنولوجيا': 'laptop',
+            'تعليم': 'graduation-cap',
+            'أخرى': 'calendar'
         };
         return icons[categoryName] || 'calendar';
     }
 };
 
-// ============ Fonctions Globales ============
+// ============ Global Functions ============
 function filterByCategory(categoryId, element) {
     document.querySelectorAll('.category-pill').forEach(pill => pill.classList.remove('active'));
     if (element) element.classList.add('active');
@@ -352,7 +352,7 @@ function filterByCategory(categoryId, element) {
 async function showEventDetails(eventId) {
     const event = await events.getById(eventId);
     if (!event) {
-        Swal.fire('Erreur', 'Impossible de charger l\'événement', 'error');
+        Swal.fire('خطأ', 'لم نتمكن من تحميل الحدث', 'error');
         return;
     }
 
@@ -361,15 +361,15 @@ async function showEventDetails(eventId) {
     document.getElementById('detail-title').textContent = event.title;
     document.getElementById('detail-image').src = event.image_url || 'https://via.placeholder.com/400x300';
     document.getElementById('detail-description').textContent = event.description || '';
-    document.getElementById('detail-venue').textContent = event.venue_address || 'Fès';
-    document.getElementById('detail-date').textContent = new Date(event.start_date).toLocaleDateString('fr-FR', {
+    document.getElementById('detail-venue').textContent = event.venue_address || 'فاس';
+    document.getElementById('detail-date').textContent = new Date(event.start_date).toLocaleDateString('ar-SA', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
     });
-    document.getElementById('detail-price').textContent = event.price === 0 ? 'Gratuit' : `${event.price} DH`;
+    document.getElementById('detail-price').textContent = event.price === 0 ? 'مجاني' : `${event.price} درهم`;
 
     document.getElementById('book-btn').onclick = () => booking.book(eventId);
 
@@ -383,14 +383,14 @@ function handleSearch(e) {
     events.search(query, date);
 }
 
-// ============ Écouteurs d'Événements des Formulaires ============
+// ============ Form Event Listeners ============
 document.addEventListener('DOMContentLoaded', async () => {
-    // Mettre à jour l'UI au chargement
+    // Update UI on load
     ui.updateAuthUI();
     await ui.loadCategories();
     await events.getAll();
 
-    // Liaisons des formulaires
+    // Form bindings
     document.getElementById('login-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
         auth.login();
