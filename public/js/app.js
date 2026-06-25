@@ -72,92 +72,164 @@ let mapInstance = null;
     scripts.forEach(s => {
         if (!document.getElementById(s.id)) {
             const sc = document.createElement('script');
-            sc.id = s.id; sc.src = s.src;
+            sc.id = s.id;
+            sc.src = s.src;
             document.head.appendChild(sc);
         }
     });
 })();
 
 // ==========================================
-// 3. INITIALISATION
+// 3. UTILITAIRE UTILISATEUR
+// ==========================================
+// 2. تعديل وظيفة استرجاع المستخدم (في app.js)
+function getCurrentUser() {
+    try {
+        const userData = localStorage.getItem('user'); // تغيير من currentUser إلى user
+        return userData ? JSON.parse(userData) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// 1. تعديل وظيفة الحفظ (في app.js)
+function setCurrentUser(user) {
+    if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+        // بما أنك تستخدم محاكاة (Mock)، سنضع توكن وهمي لكي يفتح الـ Dashboard
+        localStorage.setItem('token', 'fake-jwt-token-for-simulation'); 
+    } else {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+    }
+}
+
+// ==========================================
+// 4. INITIALISATION
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
     initAuthUI();
     renderCategories();
     renderEvents(EVENTS);
     setupSearchListeners();
+    setupAuthForms();
+    initChatBot();
 });
 
 function initAuthUI() {
-    const user = JSON.parse(localStorage.getItem('currentUser'));
+    const user = getCurrentUser();
     const authContainer = document.getElementById('auth-buttons');
     if (user && authContainer) {
         authContainer.innerHTML = `
             <div class="dropdown">
                 <button class="btn btn-primary rounded-pill dropdown-toggle px-4" data-bs-toggle="dropdown">
-                    <i class="fas fa-user-circle me-2"></i>${user.name}
+                    <i class="fas fa-user-circle me-2"></i>${escapeHtml(user.name)}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end border-0 shadow mt-2">
+                <li>
+                        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
+                            <i class="fas fa-tachometer-alt me-2"></i>Tableau de bord
+                        </button>
+                    </li>
                     <li><button class="dropdown-item text-danger" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</button></li>
                 </ul>
             </div>`;
     }
+   
 }
 
 function logout() {
-    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
     window.location.reload();
 }
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // ==========================================
-// 4. FILTRAGE ET RECHERCHE (CORRIGÉ & SYNCHRONISÉ)
+// 5. AUTHENTIFICATION
+// ==========================================
+function setupAuthForms() {
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    if (loginForm) loginForm.onsubmit = (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const role = email.includes('admin') ? 'admin' : 'user';
+        setCurrentUser({ name: email.split('@')[0], email: email });
+        window.location.reload();
+    };
+    if (registerForm) registerForm.onsubmit = (e) => {
+        e.preventDefault();
+        const name = document.getElementById('register-name').value;
+        const email = document.getElementById('register-email').value;
+        setCurrentUser({ name, email });
+        window.location.reload();
+    };
+}
+
+// ==========================================
+// 6. FILTRAGE ET RECHERCHE
 // ==========================================
 function setupSearchListeners() {
+    const searchForm = document.getElementById('search-form');
     const searchInput = document.getElementById('search-input');
+    const categorySelect = document.getElementById('category-select');
     const dateInput = document.getElementById('date-input');
 
-    const filterAll = () => {
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
-        const selectedDate = dateInput ? dateInput.value : ""; 
+    window.applyAllFilters = function() {
+        const query = searchInput.value.toLowerCase().trim();
+        const dateQuery = dateInput.value;
+        const selectedCat = categorySelect.value || currentFilterCategory;
 
         const filtered = EVENTS.filter(e => {
-            const matchCategory = currentFilterCategory === 'all' || e.category === currentFilterCategory;
             const matchText = e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query);
-            const matchDate = !selectedDate || e.date === selectedDate;
-
-            return matchCategory && matchText && matchDate;
+            const matchCategory = selectedCat === 'all' || selectedCat === "" || e.category === selectedCat;
+            const matchDate = !dateQuery || e.date === dateQuery;
+            return matchText && matchCategory && matchDate;
         });
 
         renderEvents(filtered);
     };
 
-    if (searchInput) searchInput.addEventListener('input', filterAll);
-    if (dateInput) dateInput.addEventListener('change', filterAll);
+    if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            applyAllFilters();
+        });
+    }
+
+    if (searchInput) searchInput.addEventListener('input', applyAllFilters);
+    if (categorySelect) categorySelect.addEventListener('change', (e) => {
+        currentFilterCategory = e.target.value || 'all';
+        renderCategories();
+        applyAllFilters();
+    });
+    if (dateInput) dateInput.addEventListener('change', applyAllFilters);
 }
 
 function filterByCategory(id) {
     currentFilterCategory = id;
-    renderCategories();
+    const categorySelect = document.getElementById('category-select');
+    if (categorySelect) categorySelect.value = id === 'all' ? "" : id;
     
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.dispatchEvent(new Event('input'));
-    } else {
-        const dateInput = document.getElementById('date-input');
-        if (dateInput) dateInput.dispatchEvent(new Event('change'));
-    }
+    renderCategories();
+    if (typeof applyAllFilters === 'function') applyAllFilters();
 }
 
 // ==========================================
-// 5. RENDU DE L'INTERFACE
+// 7. RENDU DE L'INTERFACE
 // ==========================================
 function renderCategories() {
     const container = document.getElementById('categories-container');
     if (!container) return;
     container.innerHTML = CATEGORIES.map(c => `
-        <div class="category-card ${c.id === currentFilterCategory ? 'active' : ''}" onclick="filterByCategory('${c.id}')">
+        <div class="category-card ${c.id === currentFilterCategory ? 'active' : ''}" onclick="filterByCategory('${c.id}')" role="button">
             <i class="fas ${c.icon} mb-2"></i>
-            <span class="small fw-bold">${c.name}</span>
+            <span class="small fw-bold">${escapeHtml(c.name)}</span>
         </div>
     `).join('');
 }
@@ -170,17 +242,17 @@ function renderEvents(list) {
         return;
     }
     container.innerHTML = list.map(e => `
-        <div class="col-md-6 col-lg-4 mb-4">
+        <div class="col-md-6 col-lg-4 mb-4" data-aos="fade-up">
             <div class="event-card shadow-sm h-100 bg-white">
-                <div class="position-relative">
-                    <img src="${e.image}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="${e.title}">
-                    <span class="badge bg-primary position-absolute m-3 top-0 start-0">${e.category}</span>
+                <div class="card-img-wrapper">
+                    <img src="${e.image}" alt="${escapeHtml(e.title)}">
+                    <span class="badge bg-primary position-absolute m-3 top-0 start-0">${escapeHtml(e.category)}</span>
                 </div>
                 <div class="p-4">
-                    <h5 class="fw-bold text-dark">${e.title}</h5>
+                    <h5 class="fw-bold text-dark">${escapeHtml(e.title)}</h5>
                     <p class="text-muted small mb-3"><i class="fas fa-calendar-alt me-2"></i>${formatDate(e.date)}</p>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold text-indigo fs-5">${e.price === 0 ? 'Gratuit' : e.price + ' DH'}</span>
+                        <span class="fw-bold text-primary fs-5">${e.price === 0 ? 'Gratuit' : e.price + ' DH'}</span>
                         <button class="btn btn-outline-primary rounded-pill px-3" onclick="openDetails(${e.id})">Détails</button>
                     </div>
                 </div>
@@ -190,7 +262,7 @@ function renderEvents(list) {
 }
 
 // ==========================================
-// 6. DÉTAILS ET MAPS
+// 8. DÉTAILS ET MAPS
 // ==========================================
 function openDetails(id) {
     const event = EVENTS.find(e => e.id === id);
@@ -198,19 +270,19 @@ function openDetails(id) {
 
     document.getElementById('detail-title').innerText = event.title;
     document.getElementById('detail-description').innerText = event.description;
+    document.getElementById('detail-date').innerText = formatDate(event.date);
+    document.getElementById('detail-price').innerText = event.price === 0 ? 'Gratuit' : event.price + ' DH';
     document.getElementById('detail-image').src = event.image;
 
-    const user = localStorage.getItem('currentUser');
+    const user = getCurrentUser();
     const bArea = document.getElementById('booking-area');
     if (bArea) {
         bArea.innerHTML = user 
-            ? `<button class="btn btn-success w-100 rounded-pill py-2 fw-bold" onclick="bookNow(${event.id})">Réserver ma place</button>`
-            : `<button class="btn btn-primary w-100 rounded-pill py-2" data-bs-toggle="modal" data-bs-target="#loginModal">Se connecter pour réserver</button>`;
+            ? `<button class="btn btn-success rounded-pill py-2 fw-bold" onclick="bookNow(${event.id})">Réserver ma place</button>`
+            : `<button class="btn btn-primary rounded-pill py-2" data-bs-toggle="modal" data-bs-target="#authChoiceModal">Se connecter pour réserver</button>`;
     }
 
-    const modalElement = document.getElementById('eventDetailsModal');
-    const modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-    modalInstance.show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('eventDetailsModal')).show();
 
     setTimeout(() => {
         if (mapInstance) mapInstance.remove();
@@ -221,187 +293,142 @@ function openDetails(id) {
 }
 
 // ==========================================
-// 7. SYSTÈME DE PAIEMENT & RÉSERVATION
+// 9. PAIEMENT & RÉSERVATION (FIXED VERSION)
 // ==========================================
 function bookNow(id) {
     const event = EVENTS.find(e => e.id === id);
-    const user = JSON.parse(localStorage.getItem('currentUser'));
-
-    if (!event || !user) return;
-
+    const user = getCurrentUser();
     Swal.fire({
-        title: 'Confirmation de réservation',
+        title: 'Confirmation',
         text: `Voulez-vous réserver pour "${event.title}" ?`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonColor: '#6366f1',
-        cancelButtonColor: '#cbd5e1',
-        confirmButtonText: 'Continuer',
-        cancelButtonText: 'Annuler'
+        confirmButtonText: 'Oui, continuer'
     }).then((res) => {
         if (res.isConfirmed) {
-            const detailModal = bootstrap.Modal.getInstance(document.getElementById('eventDetailsModal'));
-            if (detailModal) detailModal.hide();
-
-            // فحص السعر لتحديد مسار الدفع
-            if (event.price > 0) {
-                processPayment(event, user);
-            } else {
-                generateTicket(event, user);
-            }
+            bootstrap.Modal.getInstance(document.getElementById('eventDetailsModal'))?.hide();
+            if (event.price > 0) processPayment(event, user);
+            else generateTicket(event, user);
         }
     });
 }
 
 function processPayment(event, user) {
     Swal.fire({
-        title: 'Sélectionnez votre moyen de paiement',
+        title: 'Paiement Sécurisé',
         html: `
-            <div class="text-center mb-3">
-                <span class="fs-5 fw-bold text-primary">Montant à payer : ${event.price} DH</span>
-            </div>
-            <div class="d-flex flex-column gap-2 mt-3">
-                <button id="pay-cmi" class="btn btn-outline-dark py-3 rounded-3 text-start d-flex align-items-center justify-content-between">
-                    <span><i class="fas fa-credit-card me-3 text-primary"></i>Carte bancaire (CMI / Payzone)</span>
-                    <i class="fas fa-chevron-right text-muted"></i>
-                </button>
-                <button id="pay-paypal" class="btn btn-outline-primary py-3 rounded-3 text-start d-flex align-items-center justify-content-between">
-                    <span><i class="fab fa-paypal me-3 text-info"></i>Compte International PayPal</span>
-                    <i class="fas fa-chevron-right text-muted"></i>
-                </button>
-            </div>
-        `,
-        showConfirmButton: false,
-        showCancelButton: true,
-        cancelButtonText: 'Annuler',
-        didOpen: () => {
-            document.getElementById('pay-cmi').addEventListener('click', () => {
-                openCreditCardForm(event, user);
-            });
-            document.getElementById('pay-paypal').addEventListener('click', () => {
-                simulateExternalGateway("PayPal", event, user);
-            });
-        }
-    });
-}
-
-function openCreditCardForm(event, user) {
-    Swal.fire({
-        title: 'Saisissez vos coordonnées bancaires',
-        html: `
-            <div class="text-start mt-2">
-                <label class="form-label small text-muted">Nom sur la carte</label>
-                <input type="text" class="form-control mb-3 rounded-pill" value="${user.name.toUpperCase()}" placeholder="NOM COMPLET">
-                
-                <label class="form-label small text-muted">Numéro de carte</label>
-                <div class="input-group mb-3">
-                    <span class="input-group-text bg-white border-end-0 rounded-start-pill"><i class="fas fa-credit-card text-muted"></i></span>
-                    <input type="text" class="form-control border-start-0 rounded-end-pill" placeholder="4151 0000 0000 0000" maxlength="19">
+            <div class="text-start p-2">
+                <div class="alert alert-info py-2 small">Total à payer: <b>${event.price} DH</b></div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Nom sur la carte</label>
+                    <input type="text" id="card-name" class="form-control form-control-sm" placeholder="M. Mohamed">
                 </div>
-
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Numéro de carte</label>
+                    <input type="text" id="card-num" class="form-control form-control-sm" placeholder="xxxx xxxx xxxx xxxx">
+                </div>
                 <div class="row">
                     <div class="col-6">
-                        <label class="form-label small text-muted">Expiration</label>
-                        <input type="text" class="form-control rounded-pill text-center" placeholder="MM/AA" maxlength="5">
+                        <label class="form-label small mb-1">Expiration</label>
+                        <input type="text" id="card-exp" class="form-control form-control-sm" placeholder="MM/YY">
                     </div>
                     <div class="col-6">
-                        <label class="form-label small text-muted">Code CVC</label>
-                        <input type="password" class="form-control rounded-pill text-center" placeholder="123" maxlength="3">
+                        <label class="form-label small mb-1">CVC</label>
+                        <input type="password" id="card-cvc" class="form-control form-control-sm" placeholder="123">
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2 mt-3 text-muted small">
-                    <i class="fas fa-lock text-success"></i> Connexion chiffrée SSL 256-bits (Payzone Secure)
+                <div class="mt-3 text-center opacity-50">
+                    <i class="fab fa-cc-visa fa-2x mx-1"></i>
+                    <i class="fab fa-cc-mastercard fa-2x mx-1"></i>
                 </div>
             </div>
         `,
         showCancelButton: true,
-        confirmButtonText: `<i class="fas fa-check-circle me-2"></i> Payer ${event.price} DH`,
-        confirmButtonColor: '#34d399',
-        cancelButtonText: 'Retour',
-        showLoaderOnConfirm: true,
+        confirmButtonText: 'Payer maintenant',
+        cancelButtonText: 'Annuler',
+        focusConfirm: false,
         preConfirm: () => {
-            return new Promise((resolve) => {
-                setTimeout(() => { resolve(true); }, 2000); 
-            });
+            const name = document.getElementById('card-name').value;
+            const num = document.getElementById('card-num').value;
+            const exp = document.getElementById('card-exp').value;
+            const cvc = document.getElementById('card-cvc').value;
+            if (!name || num.length < 5 || !exp || cvc.length < 3) {
+                Swal.showValidationMessage('Informations de carte invalides');
+                return false;
+            }
+            return true;
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            generateTicket(event, user);
-        }
-    });
-}
-
-function simulateExternalGateway(provider, event, user) {
-    Swal.fire({
-        title: `Connexion à ${provider}...`,
-        html: 'Veuillez patienter pendant la redirection vers l\'espace sécurisé.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-            setTimeout(() => {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Paiement Accepté !',
-                    text: `Votre transaction via ${provider} a été validée avec succès.`,
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    generateTicket(event, user);
-                });
-            }, 2000);
+            Swal.fire({
+                title: 'Traitement...',
+                html: 'Validation auprès de votre banque',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                    setTimeout(() => {
+                        Swal.fire('Succès', 'Paiement effectué avec succès !', 'success')
+                            .then(() => generateTicket(event, user));
+                    }, 2000);
+                }
+            });
         }
     });
 }
 
 // ==========================================
-// 8. SYSTÈME DE GÉNÉRATION DE TICKET
+// 10. GÉNÉRATION DE TICKET
 // ==========================================
 function generateTicket(event, user) {
     document.getElementById('ticket-event-title').innerText = event.title;
     document.getElementById('ticket-user-name').innerText = user.name;
+    document.getElementById('ticket-user-email').innerText = user.email;
     document.getElementById('ticket-event-date').innerText = formatDate(event.date);
-    document.getElementById('ticket-price-badge').innerText = event.price === 0 ? 'GRATUIT' : `${event.price} DH`;
+    document.getElementById('ticket-event-location').innerText = event.location.name;
+    document.getElementById('ticket-price-badge').innerText = event.price === 0 ? 'GRATUIT' : event.price + ' DH';
 
     const qrBox = document.getElementById("modal-qrcode-target");
-    if (qrBox) {
-        qrBox.innerHTML = "";
-        new QRCode(qrBox, { text: `E-HUB-${event.id}-${Date.now()}`, width: 130, height: 130 });
-    }
+    qrBox.innerHTML = "";
+    new QRCode(qrBox, { text: `TICKET-${event.id}-${Date.now()}`, width: 120, height: 120 });
 
-    const ticketModalElement = document.getElementById('ticketModal');
-    const ticketModalInstance = new bootstrap.Modal(ticketModalElement);
-    ticketModalInstance.show();
+    new bootstrap.Modal(document.getElementById('ticketModal')).show();
 
-    const btnPdf = document.getElementById('download-ticket-btn');
-    if (btnPdf) {
-        btnPdf.onclick = function() {
-            btnPdf.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Génération...';
-            btnPdf.disabled = true;
+    document.getElementById('download-ticket-btn').onclick = function() {
+        const element = document.getElementById('ticket-print-area');
+        const opt = { margin: 10, filename: 'Ticket-EventHub.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+        html2pdf().set(opt).from(element).save();
+    };
+}
 
-            const element = document.getElementById('ticket-print-area');
-            const options = {
-                margin: 10,
-                filename: `Ticket_EventHub_${user.name.replace(/\s+/g, '_')}.pdf`,
-                image: { type: 'jpeg', quality: 1 },
-                html2canvas: { scale: 3, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            html2pdf().set(options).from(element).save().then(() => {
-                btnPdf.innerHTML = '<i class="fas fa-file-pdf me-2"></i>Télécharger mon Ticket';
-                btnPdf.disabled = false;
-                Swal.fire('Succès', 'Votre ticket est prêt !', 'success');
-            }).catch(err => {
-                console.error(err);
-                btnPdf.disabled = false;
-            });
-        };
-    }
+function formatDate(d) {
+    return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 // ==========================================
-// 9. UTILS
+// 11. CHATBOT
 // ==========================================
-function formatDate(d) {
-    return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+function initChatBot() {
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const chatMessages = document.getElementById('chat-messages');
+
+    if (chatForm) {
+        chatForm.onsubmit = (e) => {
+            e.preventDefault();
+            const val = chatInput.value.trim();
+            if (!val) return;
+
+            chatMessages.innerHTML += `<div class="bg-primary text-white p-2 rounded shadow-sm" style="align-self: flex-end; max-width: 80%;">${val}</div>`;
+            chatInput.value = "";
+
+            setTimeout(() => {
+                let reply = "Je ne suis pas sûr de comprendre. Pouvez-vous reformuler ?";
+                if (val.toLowerCase().includes("prix")) reply = "Les prix varient entre 120 DH et 350 DH. Certains sont gratuits !";
+                if (val.toLowerCase().includes("lieu")) reply = "Nos événements se déroulent partout à Fès : Bab Makina, Dar Batha, etc.";
+                
+                chatMessages.innerHTML += `<div class="bg-white p-2 rounded shadow-sm" style="align-self: flex-start; max-width: 80%;">${reply}</div>`;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 800);
+        };
+    }
 }

@@ -1,581 +1,262 @@
 <!DOCTYPE html>
-<html lang="fr" dir="ltr">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de bord | EventHub Fès</title>
-    
-    <!-- Bootstrap & Icons -->
+    <title>FestivEvents | Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Fonts & Charts -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
-        :root { 
-            --primary: #6366f1;
-            --dark: #0f172a;
-            --sidebar-bg: #1a2332;
-            --light-bg: #f8fafc;
-        }
-
-        * { font-family: 'Cairo', sans-serif; }
-
-        body {
-            background: var(--light-bg);
-            margin: 0;
-            padding: 0;
-        }
-
-        /* ============ Sidebar ============ */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 280px;
-            height: 100vh;
-            background: linear-gradient(135deg, var(--dark) 0%, var(--sidebar-bg) 100%);
-            color: white;
-            overflow-y: auto;
-            z-index: 1000;
-            box-shadow: 5px 0 20px rgba(0,0,0,0.1);
-        }
-
-        .sidebar-header {
-            padding: 30px 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-
-        .sidebar-header h3 {
-            margin: 0;
-            font-weight: 900;
-            font-size: 1.5rem;
-        }
-
-        .sidebar-header span {
-            color: #f59e0b;
-        }
-
-        .sidebar-nav {
-            padding: 20px 0;
-        }
-
-        .nav-link {
-            color: #cbd5e1;
-            padding: 12px 20px;
-            margin: 5px 10px;
-            border-radius: 12px;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-        }
-
-        .nav-link:hover {
-            background: rgba(99, 102, 241, 0.1);
-            color: white;
-        }
-
-        .nav-link.active {
-            background: var(--primary);
-            color: white;
-            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.3);
-        }
-
-        .nav-link i {
-            width: 20px;
-            text-align: center;
-        }
-
-        /* ============ Main Content ============ */
-        .main-content {
-            margin-left: 280px;
-            padding: 40px;
-            transition: 0.3s;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 40px;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .header h1 {
-            margin: 0;
-            color: var(--dark);
-            font-weight: 900;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-
-        /* ============ Stats Cards ============ */
-        .stat-card {
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            transition: all 0.3s;
-            margin-bottom: 20px;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            margin-bottom: 15px;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 900;
-            color: var(--dark);
-            margin: 10px 0;
-        }
-
-        .stat-label {
-            color: #64748b;
-            font-weight: 600;
-        }
-
-        /* ============ Sections ============ */
-        .dashboard-section {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
-
-        .dashboard-section.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ============ Table ============ */
-        .table-responsive {
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-
-        table {
-            background: white;
-        }
-
-        table thead {
-            background: var(--light-bg);
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        table th {
-            color: #64748b;
-            font-weight: 700;
-            padding: 15px;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-            letter-spacing: 0.5px;
-        }
-
-        table td {
-            padding: 15px;
-            border-bottom: 1px solid #f1f5f9;
-            color: #475569;
-        }
-
-        table tbody tr:hover {
-            background: var(--light-bg);
-        }
-
-        /* ============ Buttons ============ */
-        .btn-primary-custom {
-            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 10px 25px;
-            border-radius: 12px;
-            transition: all 0.3s;
-        }
-
-        .btn-primary-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
-            color: white;
-        }
-
-        /* ============ Forms ============ */
-        .form-control,
-        .form-select {
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            padding: 10px 15px;
-            transition: all 0.3s;
-        }
-
-        .form-control:focus,
-        .form-select:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        /* ============ Responsive ============ */
-        @media (max-width: 992px) {
-            .sidebar {
-                transform: translateX(-280px);
-                transition: 0.3s;
-            }
-
-            .sidebar.show {
-                transform: translateX(0);
-            }
-
-            .main-content {
-                margin-left: 0;
-                padding: 20px;
-            }
-        }
-        /* تصميم نافذة الدفع الفاخرة */
-.payment-card-visual {
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-    border-radius: 15px;
-    padding: 20px;
-    color: white;
-    text-align: left;
-    margin-bottom: 25px;
-    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
-    position: relative;
-    height: 160px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.card-chip {
-    width: 40px;
-    height: 30px;
-    background: #f59e0b;
-    border-radius: 5px;
-    opacity: 0.8;
-}
-
-.card-number-display {
-    font-size: 1.2rem;
-    letter-spacing: 2px;
-    font-family: 'Courier New', monospace;
-}
-
-.payment-form-group {
-    background: #f8fafc;
-    border-radius: 12px;
-    padding: 15px;
-    border: 1px solid #e2e8f0;
-}
-
-.swal2-input-custom {
-    border-radius: 8px !important;
-    border: 1px solid #cbd5e1 !important;
-    padding: 10px !important;
-    margin: 5px 0 !important;
-    width: 100% !important;
-    box-sizing: border-box;
-}
-
-.payment-summary {
-    background: #eff6ff;
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    border-right: 4px solid var(--primary);
-}
+        :root { --primary: #6366f1; --dark: #0f172a; }
+        body { background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { height: 100vh; width: 260px; position: fixed; background: var(--dark); color: white; padding-top: 20px; }
+        .nav-link { color: #94a3b8; padding: 12px 20px; cursor: pointer; text-decoration: none; display: block; }
+        .nav-link:hover, .nav-link.active { background: var(--primary); color: white; border-radius: 8px; margin: 0 10px; }
+        .main-content { margin-left: 260px; padding: 30px; }
+        .dashboard-section { display: none; }
+        .dashboard-section.active { display: block; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
 
-    <!-- ============ SIDEBAR ============ -->
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <h3>Event<span>Hub</span></h3>
-            <p class="text-muted mb-0 small" id="user-role" style="font-size: 0.8rem; margin-top: 8px;">Tableau de bord</p>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h4 class="text-center fw-bold mb-4">FestivEvents</h4>
+        <a class="nav-link active" onclick="showSection('overview', event)"><i class="fas fa-home me-2"></i> Vue d'ensemble</a>
+        <a class="nav-link" onclick="showSection('bookings', event)"><i class="fas fa-ticket-alt me-2"></i> Mes Réservations</a>
+        
+        <div id="organizer-menu" style="display:none">
+            <hr>
+            <a class="nav-link" onclick="showSection('my-events', event)"><i class="fas fa-calendar me-2"></i> Mes Événements</a>
+            <a class="nav-link" onclick="showSection('add-event', event)"><i class="fas fa-plus me-2"></i> Ajouter Event</a>
         </div>
-        <nav class="sidebar-nav">
-            <a href="#" class="nav-link active" onclick="showSection('overview')">
-                <i class="fas fa-th-large"></i> Vue d'ensemble
-            </a>
-            <a href="#" class="nav-link" onclick="showSection('bookings')">
-                <i class="fas fa-ticket-alt"></i> Mes réservations
-            </a>
-            <a href="#" class="nav-link organizer-only" onclick="showSection('my-events')">
-                <i class="fas fa-calendar-alt"></i> Mes événements
-            </a>
-            <a href="#" class="nav-link organizer-only" onclick="showSection('add-event')">
-                <i class="fas fa-plus-circle"></i> Ajouter un événement
-            </a>
-            <a href="#" class="nav-link admin-only" onclick="showSection('users')">
-                <i class="fas fa-users"></i> Utilisateurs
-            </a>
-            <a href="#" class="nav-link admin-only" onclick="showSection('statistics')">
-                <i class="fas fa-chart-line"></i> Statistiques
-            </a>
-            <hr class="opacity-25">
-            <a href="#" class="nav-link" onclick="logout()">
-                <i class="fas fa-sign-out-alt"></i> Se déconnecter
-            </a>
-        </nav>
-    </aside>
 
-    <!-- ============ MAIN CONTENT ============ -->
+        <a class="nav-link text-danger mt-5" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i> Déconnexion</a>
+    </div>
+
+    <!-- Main -->
     <div class="main-content">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1><i class="fas fa-tachometer-alt"></i> Tableau de bord</h1>
-                <p class="text-muted" id="welcome-msg">Bienvenue</p>
-            </div>
-            <div class="user-info">
-                <i class="fas fa-user-circle" style="font-size: 2rem; color: var(--primary);"></i>
-                <div>
-                    <p class="mb-0 fw-bold" id="user-name">Utilisateur</p>
-                    <small class="text-muted" id="user-email">user@example.com</small>
-                </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 id="welcome-msg">Bonjour!</h2>
+            <div class="text-end">
+                <span class="badge bg-primary" id="user-role">Role</span>
+                <p class="small text-muted mb-0" id="user-email"></p>
             </div>
         </div>
 
-        <!-- ============ OVERVIEW SECTION ============ -->
+        <!-- Section 1: Overview -->
         <div id="overview" class="dashboard-section active">
-            <div class="row mb-5">
-                <div class="col-lg-3 col-md-6">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary);">
-                            <i class="fas fa-ticket-alt"></i>
-                        </div>
-                        <p class="stat-label">Réservations</p>
-                        <p class="stat-value" id="total-bookings">0</p>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card p-4 bg-white">
+                        <h6>Total Réservations</h6>
+                        <h2 id="total-bookings" class="fw-bold">0</h2>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
-                            <i class="fas fa-calendar-check"></i>
-                        </div>
-                        <p class="stat-label">Événements</p>
-                        <p class="stat-value" id="total-events">0</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-                            <i class="fas fa-star"></i>
-                        </div>
-                        <p class="stat-label">Note</p>
-                        <p class="stat-value" id="user-rating">4.5</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <p class="stat-label">Abonnés</p>
-                        <p class="stat-value" id="followers">0</p>
+                <div class="col-md-4">
+                    <div class="card p-4 bg-white">
+                        <h6>Événements Actifs</h6>
+                        <h2 id="total-events" class="fw-bold">0</h2>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ============ BOOKINGS SECTION ============ -->
+        <!-- Section 2: Bookings -->
         <div id="bookings" class="dashboard-section">
-            <div class="stat-card">
-                <h3 class="mb-4"><i class="fas fa-ticket-alt"></i> Mes réservations</h3>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>N° Réservation</th>
-                                <th>Événement</th>
-                                <th>Date</th>
-                                <th>Statut</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bookings-table">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">Chargement en cours...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="card p-4">
+                <h4 class="mb-4">Mes Réservations</h4>
+                <table class="table">
+                    <thead><tr><th>ID</th><th>Événement</th><th>Date</th><th>Statut</th></tr></thead>
+                    <tbody id="bookings-table"></tbody>
+                </table>
             </div>
         </div>
 
-        <!-- ============ MY EVENTS SECTION ============ -->
-        <div id="my-events" class="dashboard-section organizer-only">
-            <div class="stat-card">
-                <h3 class="mb-4"><i class="fas fa-calendar-alt"></i> Mes événements</h3>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Nom de l'événement</th>
-                                <th>Date</th>
-                                <th>Participants</th>
-                                <th>Statut</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="events-table">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">Chargement en cours...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        <!-- Section 3: My Events -->
+        <div id="my-events" class="dashboard-section">
+            <div class="card p-4">
+                <h4>Mes Événements</h4>
+                <table class="table">
+                    <thead><tr><th>Titre</th><th>Date</th><th>Ventes</th></tr></thead>
+                    <tbody id="events-table"></tbody>
+                </table>
             </div>
         </div>
 
-        <!-- ============ ADD EVENT SECTION ============ -->
-        <div id="add-event" class="dashboard-section organizer-only">
-            <div class="stat-card">
-                <h3 class="mb-4"><i class="fas fa-plus-circle"></i> Ajouter un nouvel événement</h3>
+        <!-- Section 4: Add Event -->
+        <div id="add-event" class="dashboard-section">
+            <div class="card p-4">
+                <h4>Ajouter un événement</h4>
                 <form id="add-event-form">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Nom de l'événement</label>
-                            <input type="text" class="form-control" name="title" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Catégorie</label>
-                            <select class="form-select" name="category_id" id="category-select" required></select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Prix (DH)</label>
-                            <input type="number" class="form-control" name="price" value="0">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Lieu</label>
-                            <input type="text" class="form-control" name="venue_address" placeholder="Fès" required>
-                        </div>
-                        <div class="col-12 mb-3">
-                            <label class="form-label fw-bold">Description</label>
-                            <textarea class="form-control" name="description" rows="3" required></textarea>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Date de début</label>
-                            <input type="datetime-local" class="form-control" name="start_date" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Image</label>
-                            <input type="file" class="form-control" name="image" accept="image/*">
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary-custom w-100">
-                                <i class="fas fa-paper-plane"></i> Publier l'événement
-                            </button>
-                        </div>
-                    </div>
+                    <div class="mb-3"><label>Titre</label><input type="text" name="title" class="form-control" required></div>
+                    <div class="mb-3"><label>Capacité</label><input type="number" name="available_seats" class="form-control" required></div>
+                    <div class="mb-3"><label>Prix (DH)</label><input type="number" name="price" class="form-control" required></div>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
                 </form>
             </div>
         </div>
-
-        <!-- ============ USERS SECTION ============ -->
-        <div id="users" class="dashboard-section admin-only">
-            <div class="stat-card">
-                <h3 class="mb-4"><i class="fas fa-users"></i> Utilisateurs</h3>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Nom</th>
-                                <th>Email</th>
-                                <th>Rôle</th>
-                                <th>Date</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">Chargement en cours...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============ STATISTICS SECTION ============ -->
-        <div id="statistics" class="dashboard-section admin-only">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="stat-card">
-                        <h4 class="mb-4">Statistiques des réservations</h4>
-                        <canvas id="bookings-chart"></canvas>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="stat-card">
-                        <h4 class="mb-4">Distribution des catégories</h4>
-                        <canvas id="categories-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <!-- ============ SCRIPTS ============ -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/dashboard.js"></script>
-    <!-- Modal عرض التذكرة -->
-<div class="modal fade" id="ticketModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="fas fa-ticket-alt"></i> Votre Ticket Officiel</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center p-5">
-                <div id="qr-code-container" class="mb-4">
-                    <!-- هنا سيظهر الـ QR Code -->
-                </div>
-                <h4 id="ticket-event-title" class="fw-bold mb-2"></h4>
-                <p id="ticket-booking-number" class="text-muted small mb-3"></p>
-                <div class="alert alert-light border small text-start">
-                    <p class="mb-1"><strong>Passager:</strong> <span id="ticket-user-name"></span></p>
-                    <p class="mb-0"><strong>Lieu:</strong> <span id="ticket-venue"></span></p>
-                </div>
-                <button class="btn btn-outline-primary btn-sm mt-3" onclick="window.print()">
-                    <i class="fas fa-download"></i> Télécharger PDF
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+    <script>
+    // استخدام var لتجنب أخطاء إعادة التعريف
+    var API_URL = "http://127.0.0.1:8000/api";
+
+    window.onload = function() {
+        const token = localStorage.getItem('token');
+        const userStr = localStorage.getItem('user');
+        
+        // إذا لم تكن هناك بيانات، ارجع لصفحة الدخول
+        if (!token || !userStr || userStr === "undefined") {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        try {
+            const user = JSON.parse(userStr);
+            console.log("Utilisateur connecté:", user); // للتأكد من البيانات في Console
+
+            // تحديث بيانات الملف الشخصي مع حماية ضد القيم الفارغة
+            const name = user.name || 'Utilisateur';
+            const role = (user.role || 'user').toUpperCase(); // إصلاح مشكلة toUpperCase
+
+            document.getElementById('welcome-msg').innerText = `Bonjour, ${name} 👋`;
+            document.getElementById('user-email').innerText = user.email || '';
+            document.getElementById('user-role').innerText = role;
+
+            // إظهار قائمة المنظم بناءً على الرتبة
+            const lowerRole = (user.role || 'user').toLowerCase();
+            if (lowerRole === 'organizer' || lowerRole === 'admin') {
+                document.getElementById('organizer-menu').style.display = 'block';
+            }
+
+            // تحميل أول قسم
+            loadOverview();
+
+        } catch (e) {
+            console.error("Erreur parsing user:", e);
+            logout();
+        }
+    };
+
+    // دالة التنقل بين الأقسام
+    function showSection(sectionId, event) {
+        if(event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        console.log("Changement de section vers:", sectionId);
+
+        // تغيير حالة الروابط
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        // نحدد الزر الذي تم ضغطه
+        if(event && event.currentTarget) event.currentTarget.classList.add('active');
+
+        // إخفاء وإظهار الأقسام
+        document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
+        const target = document.getElementById(sectionId);
+        if(target) target.classList.add('active');
+
+        // جلب بيانات القسم المختار
+        if (sectionId === 'bookings') loadBookings();
+        if (sectionId === 'my-events') loadMyEvents();
+        if (sectionId === 'overview') loadOverview();
+    }
+
+    // دالة جلب البيانات (المحسنة)
+    async function fetchAPI(endpoint, method = 'GET', body = null) {
+        const token = localStorage.getItem('token');
+        
+        // تأكد من أن التوكن ليس نصاً فارغاً أو كلمة "null"
+        if (!token || token === "null") {
+            console.error("Token manquant!");
+            return null;
+        }
+
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+        };
+
+        let options = { method, headers };
+        
+        // إذا كان الجسم FormData (مثل رفع الصور)، لا نضع Content-Type يدوياً
+        if (body) {
+            options.body = body;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, options);
+            
+            if (response.status === 401) {
+                console.error("401: Non autorisé. Vérifiez le Token.");
+                Swal.fire('Session expirée', 'Veuillez vous reconnecter', 'warning').then(() => {
+                    logout();
+                });
+                return null;
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error("Erreur réseau:", error);
+            return null;
+        }
+    }
+
+    async function loadOverview() {
+        const result = await fetchAPI('/stats/overview');
+        if (result && result.data) {
+            document.getElementById('total-bookings').innerText = result.data.total_bookings || 0;
+            document.getElementById('total-events').innerText = result.data.total_events || 0;
+        }
+    }
+
+    async function loadBookings() {
+        const tbody = document.getElementById('bookings-table');
+        if(!tbody) return;
+        
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
+        
+        const result = await fetchAPI('/my-bookings');
+        if (result && result.data) {
+            if (result.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = result.data.map(b => `
+                <tr>
+                    <td>#${b.id}</td>
+                    <td>${b.event ? b.event.title : 'Event'}</td>
+                    <td>${new Date(b.created_at).toLocaleDateString()}</td>
+                    <td><span class="badge bg-success">${b.status}</span></td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    async function loadMyEvents() {
+        const tbody = document.getElementById('events-table');
+        const result = await fetchAPI('/organizer/events');
+        if (result && result.data) {
+            tbody.innerHTML = result.data.map(e => `
+                <tr>
+                    <td>${e.title}</td>
+                    <td>${e.start_date}</td>
+                    <td>${e.bookings_count || 0}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    function logout() {
+        localStorage.clear();
+        window.location.href = 'index.html';
+    }
+</script>
 </body>
 </html>

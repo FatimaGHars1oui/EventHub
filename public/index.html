@@ -197,7 +197,7 @@
     <section class="hero">
         <div class="container" data-aos="fade-up">
             <h1 class="display-2 fw-bold mb-3">Découvrez la magie de <span>Fès</span></h1>
-            <p class="fs-4 fw-light opacity-75">Les meilleures expériences culturelles et藝術iques en un clic.</p>
+            <p class="fs-4 fw-light opacity-75">Les meilleures expériences culturelles et artistiques en un clic.</p>
         </div>
     </section>
 
@@ -466,5 +466,33 @@
         document.getElementById('chat-button').onclick = toggleChat;
         document.getElementById('close-chat').onclick = toggleChat;
     </script>
+    <!-- Modal Choice: Connexion ou Inscription -->
+<div class="modal fade" id="authChoiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Réservation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="fas fa-user-lock fa-3x text-primary mb-3"></i>
+                <h4 class="fw-bold">Prêt pour l'aventure ?</h4>
+                <p class="text-muted">Vous devez avoir un compte pour réserver vos places aux événements.</p>
+                
+                <div class="d-grid gap-3 mt-4">
+                    <!-- يفتح مودال تسجيل الدخول -->
+                    <button class="btn btn-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <i class="fas fa-sign-in-alt me-2"></i>Se connecter
+                    </button>
+                    
+                    <!-- يفتح مودال إنشاء حساب -->
+                    <button class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#registerModal">
+                        <i class="fas fa-user-plus me-2"></i>Créer un compte
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
-</html
+</html>

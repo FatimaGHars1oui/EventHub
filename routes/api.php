@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\StatsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,6 +46,10 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 */
 Route::middleware('auth:sanctum')->group(function () {
 
+Route::get('/stats/overview', [StatsController::class, 'overview']);
+
+Route::get('/my-bookings', [BookingController::class, 'myBookings']);
+
 Route::post('/bookings', [BookingController::class, 'store']);
     // --- الحساب الشخصي ---
     Route::get('/auth/me', [AuthController::class, 'me']);
@@ -65,6 +70,8 @@ Route::post('/bookings', [BookingController::class, 'store']);
     |--------------------------------------------------------------------------
     */
     Route::middleware('role:admin,organizer')->group(function () {
+
+    
         
         // إدارة الفعاليات (نشر، تعديل، حذف)
         Route::post('/events', [EventController::class, 'store']);         // إضافة فعالية مع صورة

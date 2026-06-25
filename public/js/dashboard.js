@@ -1,156 +1,189 @@
-const API_URL = "http://127.0.0.1:8000/api";
-let revenueChart = null;
+/**
+ * FestivEvents - Dashboard Logic
+ * Handles UI, Authentication, and API Requests
+ */
+
+// استخدام تعريف آمن لمتغير الـ API
+var API_URL = "http://127.0.0.1:8000/api";
+var bookingsChart = null;
+var categoriesChart = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user'));
+    const userStr = localStorage.getItem('user');
 
-    if (!token || !user) {
-        window.location.href = 'index.html';
+    // 1. التحقق من التوكن والبيانات (معالجة Corruption)
+    if (!token || !userStr || userStr === "undefined") {
+        console.warn("Session expirée ou invalide");
+        logout();
         return;
     }
 
-    setupUI(user);
-    loadSection('overview'); // التحميل الافتراضي
+    try {
+        const user = JSON.parse(userStr);
+        initUI(user);
+        showSection('overview');
+        
+        // ربط الـ Form
+        const addEventForm = document.getElementById('add-event-form');
+        if (addEventForm) addEventForm.addEventListener('submit', handleAddEvent);
+
+    } catch (e) {
+        console.error("Critical error during init:", e);
+        logout();
+    }
 });
 
-// 1. إعداد الواجهة حسب الرتبة
-function setupUI(user) {
-    document.getElementById('user-name').innerText = user.name;
-    document.getElementById('user-role').innerText = user.role.toUpperCase();
-
-    // إخفاء الأقسام غير المصرح بها
-    if (user.role === 'admin') {
-        document.querySelectorAll('.user-only').forEach(el => el.remove());
-    } else {
-        document.querySelectorAll('.admin-only').forEach(el => el.remove());
-    }
-}
-
-// 2. التنقل بين الأقسام
-async function loadSection(section) {
-    // تمييز الرابط النشط
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    event?.currentTarget?.classList.add('active');
-
-    // إخفاء كافة الأقسام وإظهار المطلوب
-    document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
-    document.getElementById(section).classList.add('active');
-
-    const user = JSON.parse(localStorage.getItem('user'));
-
-    if (section === 'overview') {
-        user.role === 'admin' ? loadAdminStats() : loadUserStats();
-    } else if (section === 'bookings') {
-        loadUserBookings();
-    } else if (section === 'manage-events') {
-        loadAdminEvents();
-    } else if (section === 'scanner') {
-        startQRScanner();
-    }
-}
-
 // ==========================================
-// قسم المستخدم (USER SECTION)
+// 1. إعداد الواجهة (UI Management)
 // ==========================================
+function initUI(user) {
+    if (!user) return;
 
-async function loadUserStats() {
-    const res = await fetchWithAuth(`${API_URL}/my-bookings`);
-    const result = await res.json();
-    if (result.success) {
-        document.getElementById('total-bookings-count').innerText = result.data.length;
-        const totalSpent = result.data.reduce((sum, b) => sum + parseFloat(b.total_amount), 0);
-        document.getElementById('total-spent').innerText = totalSpent.toFixed(2) + ' MAD';
-    }
-}
+    // حماية ضد خطأ toUpperCase (استخدام "USER" كقيمة افتراضية)
+    const role = (user.role || 'user').toUpperCase();
+    const name = user.name || 'Utilisateur';
 
-async function loadUserBookings() {
-    const res = await fetchWithAuth(`${API_URL}/my-bookings`);
-    const result = await res.json();
-    const tbody = document.getElementById('user-bookings-table');
+    // تحديث المعلومات
+    updateText('user-name', name);
+    updateText('user-email', user.email || '');
+    updateText('welcome-msg', `Bienvenue, ${name} 👋`);
+    updateText('user-role', role);
     
-    tbody.innerHTML = result.data.map(b => `
+    const avatar = document.getElementById('user-avatar');
+    if (avatar) avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+
+    // التحكم في الرتب (Admin/Organizer/User)
+    const lowerRole = role.toLowerCase();
+    document.querySelectorAll('.admin-only, .organizer-only').forEach(el => el.style.display = 'none');
+
+    if (lowerRole === 'admin') {
+        document.querySelectorAll('.admin-only, .organizer-only').forEach(el => el.style.display = 'block');
+    } else if (lowerRole === 'organizer') {
+        document.querySelectorAll('.organizer-only').forEach(el => el.style.display = 'block');
+    }
+}
+
+function showSection(sectionId) {
+    // تبديل شكل الروابط
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    event?.target?.classList.add('active');
+
+    // تبديل الأقسام
+    document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById(sectionId);
+    if (target) target.classList.add('active');
+
+    // تحميل البيانات حسب القسم المفتوح
+    switch (sectionId) {
+        case 'overview': loadOverviewStats(); initCharts(); break;
+        case 'bookings': loadBookings(); break;
+        case 'add-event': loadCategories(); break;
+    }
+}
+
+// ==========================================
+// 2. معالجة الطلبات (API Handling)
+// ==========================================
+async function fetchWithAuth(endpoint, options = {}) {
+    const token = localStorage.getItem('token');
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+    };
+
+    if (options.body && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    try {
+        const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+        
+        if (response.status === 401) {
+            logout();
+            return null;
+        }
+        return response;
+    } catch (err) {
+        console.error("Fetch Error:", err);
+        return null;
+    }
+}
+
+// جلب الإحصائيات (Overview)
+async function loadOverviewStats() {
+    const res = await fetchWithAuth('/stats/overview');
+    if (res && res.ok) {
+        const result = await res.json();
+        updateText('total-bookings', result.data.total_bookings || 0);
+        updateText('total-events', result.data.total_events || 0);
+    }
+}
+
+// جلب الحجوزات (Bookings)
+async function loadBookings() {
+    const tbody = document.getElementById('bookings-table');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
+
+    const res = await fetchWithAuth('/my-bookings');
+    if (!res || !res.ok) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Erreur de chargement</td></tr>';
+        return;
+    }
+
+    const result = await res.json();
+    const data = result.data || [];
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aucune réservation trouvée.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map(b => `
         <tr>
-            <td>${b.event.title}</td>
-            <td><span class="badge bg-info">${b.quantity} places</span></td>
+            <td class="fw-bold">#${b.id}</td>
+            <td>${b.event ? b.event.title : 'N/A'}</td>
+            <td>${new Date(b.created_at).toLocaleDateString('fr-FR')}</td>
             <td><span class="badge bg-${b.status === 'confirmed' ? 'success' : 'warning'}">${b.status}</span></td>
-            <td>
-                ${b.status === 'confirmed' ? 
-                    `<button onclick="openReviewModal(${b.event_id})" class="btn btn-sm btn-outline-primary">Évaluer</button>` : 
-                    `<button onclick="cancelBooking(${b.id})" class="btn btn-sm btn-outline-danger">Annuler</button>`
-                }
-            </td>
+            <td><button class="btn btn-sm btn-outline-primary" onclick="viewTicket(${b.id})">Détails</button></td>
         </tr>
     `).join('');
 }
 
-// إلغاء الحجز
-async function cancelBooking(id) {
-    const confirm = await Swal.fire({ title: 'Annuler?', text: 'Voulez-vous annuler ce حجز?', icon: 'warning', showCancelButton: true });
-    if (confirm.isConfirmed) {
-        const res = await fetchWithAuth(`${API_URL}/bookings/${id}`, { method: 'DELETE' });
-        if (res.ok) { Swal.fire('Annulé', '', 'success'); loadUserBookings(); }
-    }
-}
-
-// تقييم الفعالية
-function openReviewModal(eventId) {
-    Swal.fire({
-        title: 'Évaluer l\'événement',
-        html: `
-            <select id="rating-val" class="swal2-input">
-                <option value="5">⭐⭐⭐⭐ stars</option>
-                <option value="4">⭐⭐⭐⭐ stars</option>
-                <option value="3">⭐⭐⭐ stars</option>
-                <option value="2">⭐⭐ stars</option>
-                <option value="1">⭐ star</option>
-            </select>
-            <textarea id="rating-comment" class="swal2-textarea" placeholder="Votre commentaire..."></textarea>
-        `,
-        confirmButtonText: 'Envoyer',
-        preConfirm: () => {
-            return {
-                event_id: eventId,
-                rating: document.getElementById('rating-val').value,
-                comment: document.getElementById('rating-comment').value
-            }
-        }
-    }).then(async (result) => {
-        if (result.isConfirmed) {
-            const res = await fetchWithAuth(`${API_URL}/reviews`, {
-                method: 'POST',
-                body: JSON.stringify(result.value)
-            });
-            if (res.ok) Swal.fire('Merci!', 'Votre avis compte pour nous.', 'success');
-        }
-    });
-}
-
 // ==========================================
-// قسم الإدارة (ADMIN SECTION)
+// 3. الرسوم البيانية (Charts)
 // ==========================================
+function initCharts() {
+    const ctx1 = document.getElementById('bookings-chart')?.getContext('2d');
+    if (!ctx1) return;
 
-async function loadAdminStats() {
-    const res = await fetchWithAuth(`${API_URL}/admin/stats`);
-    const result = await res.json();
-    const data = result.data;
-
-    document.getElementById('admin-total-revenue').innerText = data.total_revenue + ' MAD';
-    document.getElementById('admin-total-users').innerText = data.total_users;
-
-    // رسم مبيان الأرباح
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    if (revenueChart) revenueChart.destroy();
-    revenueChart = new Chart(ctx, {
+    if (bookingsChart) bookingsChart.destroy();
+    bookingsChart = new Chart(ctx1, {
         type: 'line',
         data: {
-            labels: data.bookings_trend.map(i => i.date),
-            datasets: [{ label: 'Revenue', data: data.bookings_trend.map(i => i.count), borderColor: '#6366f1', fill: true }]
+            labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+            datasets: [{ label: 'Réservations', data: [5, 12, 8, 15, 20, 25, 18], borderColor: '#6366f1', tension: 0.4 }]
         }
     });
 }
 
-// إضافة فعالية جديدة
+// ==========================================
+// 4. المساعدون (Helpers)
+// ==========================================
+function updateText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
+}
+
+async function loadCategories() {
+    const select = document.getElementById('category-select');
+    if (!select || select.options.length > 0) return;
+    const res = await fetch(`${API_URL}/categories`);
+    const result = await res.json();
+    select.innerHTML = result.data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+}
+
 async function handleAddEvent(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -159,41 +192,11 @@ async function handleAddEvent(e) {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
         body: formData
     });
-    if (res.ok) { Swal.fire('Succès', 'Événement ajouté!', 'success'); loadSection('manage-events'); }
-}
-
-// الـ Scanner للمنظم
-function startQRScanner() {
-    const html5QrCode = new Html5Qrcode("reader");
-    html5QrCode.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText) => {
-            const res = await fetchWithAuth(`${API_URL}/bookings/check-in`, {
-                method: 'POST',
-                body: JSON.stringify({ booking_number: decodedText })
-            });
-            const result = await res.json();
-            Swal.fire(result.success ? 'Accès Autorisé' : 'Erreur', result.message, result.success ? 'success' : 'error');
-            html5QrCode.stop();
-        }
-    );
-}
-
-// ==========================================
-// وظائف مساعدة (HELPERS)
-// ==========================================
-
-async function fetchWithAuth(url, options = {}) {
-    const token = localStorage.getItem('token');
-    const defaultOptions = {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-    };
-    return fetch(url, { ...defaultOptions, ...options });
+    if (res.ok) {
+        Swal.fire('Succès', 'Événement créé!', 'success');
+        e.target.reset();
+        showSection('overview');
+    }
 }
 
 function logout() {
