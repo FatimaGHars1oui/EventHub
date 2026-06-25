@@ -20,6 +20,8 @@ use App\Http\Controllers\Api\ReviewController;
 | متاحة للزوار بدون تسجيل دخول - تمنع خطأ 401 في الصفحة الرئيسية
 |--------------------------------------------------------------------------
 */
+Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/login', [AuthController::class, 'login']);
 
 // الفعاليات (البحث النصي + الفلترة بالتاريخ + الترقيم)
 Route::get('/events', [EventController::class, 'index']);
@@ -43,6 +45,7 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 */
 Route::middleware('auth:sanctum')->group(function () {
 
+Route::post('/bookings', [BookingController::class, 'store']);
     // --- الحساب الشخصي ---
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -90,5 +93,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/categories', [CategoryController::class, 'store']);
         Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
     });
+    Route::get('/dashboard/overview', [AdminController::class, 'getStats']);
+    // routes/api.php
+Route::post('/auth/register', [AuthController::class, 'register']);
 
 });

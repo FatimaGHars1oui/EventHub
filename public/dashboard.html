@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root { 
@@ -261,6 +262,59 @@
                 padding: 20px;
             }
         }
+        /* تصميم نافذة الدفع الفاخرة */
+.payment-card-visual {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    border-radius: 15px;
+    padding: 20px;
+    color: white;
+    text-align: left;
+    margin-bottom: 25px;
+    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    position: relative;
+    height: 160px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.card-chip {
+    width: 40px;
+    height: 30px;
+    background: #f59e0b;
+    border-radius: 5px;
+    opacity: 0.8;
+}
+
+.card-number-display {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+}
+
+.payment-form-group {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid #e2e8f0;
+}
+
+.swal2-input-custom {
+    border-radius: 8px !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 10px !important;
+    margin: 5px 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.payment-summary {
+    background: #eff6ff;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-right: 4px solid var(--primary);
+}
     </style>
 </head>
 <body>
@@ -497,6 +551,31 @@
     <!-- ============ SCRIPTS ============ -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/dashboard.js"></script>
+    <!-- Modal عرض التذكرة -->
+<div class="modal fade" id="ticketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-ticket-alt"></i> Votre Ticket Officiel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-5">
+                <div id="qr-code-container" class="mb-4">
+                    <!-- هنا سيظهر الـ QR Code -->
+                </div>
+                <h4 id="ticket-event-title" class="fw-bold mb-2"></h4>
+                <p id="ticket-booking-number" class="text-muted small mb-3"></p>
+                <div class="alert alert-light border small text-start">
+                    <p class="mb-1"><strong>Passager:</strong> <span id="ticket-user-name"></span></p>
+                    <p class="mb-0"><strong>Lieu:</strong> <span id="ticket-venue"></span></p>
+                </div>
+                <button class="btn btn-outline-primary btn-sm mt-3" onclick="window.print()">
+                    <i class="fas fa-download"></i> Télécharger PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>

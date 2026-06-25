@@ -3,21 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EventHub Fès | Plateforme d'Événements de Luxe</title>
+    <title>EventHub Fès | Plateforme d'Événements Premium</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <style>
         :root { 
             --primary: #6366f1;
@@ -27,436 +20,155 @@
             --border-color: #e2e8f0;
         }
 
-        * { font-family: 'Cairo', sans-serif; }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Playfair Display', serif; }
-
-        body {
-            background: var(--light-bg);
-            color: #1e293b;
-            overflow-x: hidden;
+        html {
+            scroll-behavior: smooth;
         }
+
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: var(--light-bg); 
+            color: #1e293b; 
+            overflow-x: hidden; 
+        }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Playfair Display', serif; }
 
         /* ============ Navigation ============ */
         .navbar {
             background: linear-gradient(135deg, var(--dark) 0%, #1a2332 100%);
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            backdrop-filter: blur(10px);
-            padding: 1rem 0;
+            backdrop-filter: blur(10px); 
+            padding: 1rem 0; 
             border-bottom: 2px solid var(--primary);
         }
-
-        .navbar-brand {
-            font-size: 1.8rem;
-            font-weight: 900;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
+        .navbar-brand { font-size: 1.8rem; font-weight: 900; color: white !important; }
         .navbar-brand span { color: var(--gold); }
+        .nav-link { color: #e2e8f0 !important; font-weight: 500; margin: 0 10px; transition: 0.3s; }
+        .nav-link:hover { color: var(--gold) !important; }
 
-        .nav-link {
-            color: #e2e8f0 !important;
-            font-weight: 500;
-            margin: 0 10px;
-            transition: all 0.3s;
-            position: relative;
-        }
-
-        .nav-link:hover { 
-            color: var(--gold) !important;
-            text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
-        }
-
-        /* ============ Hero Section ============ */
+        /* ============ Hero & Search ============ */
         .hero {
             background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(99, 102, 241, 0.3) 100%),
-                        url('https://images.unsplash.com/photo-1549913772-820279f902b4?q=80&w=2070');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            height: 70vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
+                        url('https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2070');
+            background-size: cover; background-position: center; height: 70vh;
+            display: flex; align-items: center; justify-content: center; color: white; text-align: center;
         }
+        .search-box { background: white; border-radius: 50px; padding: 15px 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); margin-top: -50px; }
+        .search-box input, .search-box select { border: none; outline: none; box-shadow: none !important; background: transparent; }
 
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
-            animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-            animation: slideUp 0.8s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .hero h1 {
-            font-size: 4rem;
-            font-weight: 900;
-            line-height: 1.1;
-            margin-bottom: 1rem;
-            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-
-        .hero h1 span { 
-            color: var(--gold);
-            display: inline-block;
-            animation: glow 2s ease-in-out infinite;
-        }
-
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 20px rgba(245, 158, 11, 0.5); }
-            50% { text-shadow: 0 0 40px rgba(245, 158, 11, 0.8); }
-        }
-
-        .hero p {
-            font-size: 1.3rem;
-            font-weight: 300;
-            margin-top: 1rem;
-            opacity: 0.95;
-            line-height: 1.6;
-        }
-
-        /* ============ Search Bar ============ */
-        .search-section {
-            margin: -60px auto 80px;
-            max-width: 1000px;
-            position: relative;
-            z-index: 10;
-            padding: 0 20px;
-        }
-
-        .search-box {
+        /* ============ Catégories Luxe ============ */
+        .category-card {
             background: white;
-            border-radius: 30px;
-            padding: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-            border: 2px solid var(--border-color);
-            transition: all 0.4s;
-        }
-
-        .search-box:focus-within {
-            box-shadow: 0 30px 80px rgba(99, 102, 241, 0.2);
-            border-color: var(--primary);
-            transform: translateY(-5px);
-        }
-
-        .search-box input {
-            border: none;
-            outline: none;
-            font-weight: 500;
-            color: #1e293b;
-        }
-
-        .search-box input::placeholder {
-            color: #cbd5e1;
-        }
-
-        .search-box .input-group-text {
-            background: transparent;
-            border: none;
-            color: var(--primary);
-        }
-
-        .btn-search {
-            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 12px 40px;
-            border-radius: 25px;
-            transition: all 0.3s;
-        }
-
-        .btn-search:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
-        }
-
-        /* ============ Category Pills ============ */
-        .categories-section {
-            padding: 60px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 25px 20px;
+            width: 140px;
             text-align: center;
-        }
-
-        .category-pill {
-            display: inline-block;
-            padding: 12px 28px;
-            margin: 8px;
-            border-radius: 50px;
-            background: white;
-            border: 2px solid var(--border-color);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
-            color: #475569;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
         }
-
-        .category-pill:hover,
-        .category-pill.active {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: white;
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
-        }
+        .category-card i { font-size: 2rem; color: var(--primary); transition: 0.3s; }
+        .category-card span { font-weight: 700; font-size: 0.9rem; color: var(--dark); }
+        .category-card:hover { transform: translateY(-10px); border-color: var(--primary); box-shadow: 0 20px 40px rgba(99, 102, 241, 0.1); }
+        .category-card.active { background: var(--primary); border-color: var(--primary); box-shadow: 0 15px 30px rgba(99, 102, 241, 0.3); }
+        .category-card.active i, .category-card.active span { color: white; }
 
         /* ============ Event Cards ============ */
-        .event-card {
-            border: none;
-            border-radius: 24px;
-            overflow: hidden;
-            background: white;
-            height: 100%;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            position: relative;
-        }
+        .event-card { border-radius: 24px; overflow: hidden; background: white; transition: 0.4s; border: 1px solid var(--border-color); height: 100%; }
+        .event-card:hover { transform: translateY(-10px); box-shadow: 0 30px 60px rgba(0,0,0,0.1); }
+        .card-img-wrapper { height: 200px; overflow: hidden; position: relative; }
+        .card-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
 
-        .event-card:hover {
-            transform: translateY(-15px);
-            box-shadow: 0 30px 60px rgba(0,0,0,0.12);
-            border-color: var(--primary);
-        }
-
-        .card-img-wrapper {
-            height: 240px;
-            overflow: hidden;
-            position: relative;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .card-img-wrapper img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.4s;
-        }
-
-        .event-card:hover .card-img-wrapper img {
-            transform: scale(1.1);
-        }
-
-        .date-badge {
-            position: absolute;
-            top: 15px;
-            left: 15px; /* Adjusted for LTR */
-            background: white;
-            padding: 8px 14px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-            z-index: 10;
-            min-width: 65px;
-        }
-
-        .date-badge .day {
-            display: block;
-            font-weight: 900;
-            font-size: 1.4rem;
-            color: var(--primary);
-            line-height: 1;
-        }
-
-        .date-badge .month {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            font-weight: 600;
-            color: #64748b;
-            margin-top: 3px;
-        }
-
-        .category-badge {
-            position: absolute;
-            top: 15px;
-            right: 15px; /* Adjusted for LTR */
-            background: rgba(99, 102, 241, 0.9);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            z-index: 9;
-        }
-
-        .card-body {
-            padding: 24px;
-        }
-
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--dark);
-            margin-bottom: 12px;
-            line-height: 1.4;
-        }
-
-        .card-location {
-            color: #64748b;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 12px;
-        }
-
-        .card-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .price-badge {
-            font-weight: 700;
-            color: var(--primary);
-            font-size: 1.2rem;
-        }
-
-        .rating {
-            color: var(--gold);
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
+        /* ============ Chatbot ============ */
+        .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+        #chatbot-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; }
+        #chat-button { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 24px; color: white; background: var(--primary); box-shadow: 0 10px 25px rgba(99,102,241,0.4); }
+        #chat-window { position: absolute; bottom: 80px; right: 0; width: 340px; height: 450px; background: white; border-radius: 20px; display: none; flex-direction: column; overflow: hidden; }
 
         /* ============ Footer ============ */
-        footer {
-            background: linear-gradient(135deg, var(--dark) 0%, #1a2332 100%);
-            color: #94a3b8;
-            padding: 80px 0 30px;
-            border-top: 2px solid var(--primary);
-            margin-top: 120px;
-        }
+        .footer-premium { background: var(--dark); color: #94a3b8; padding: 100px 0 40px; }
+        .footer-premium h3 { color: white; font-weight: 900; }
+        .footer-link { color: #cbd5e1; text-decoration: none; display: block; margin-bottom: 12px; transition: 0.3s; }
+        .footer-link:hover { color: var(--gold); padding-left: 10px; }
+        .social-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.1); display: inline-flex; align-items: center; justify-content: center; color: white; margin-right: 10px; transition: 0.3s; }
+        .social-icon:hover { background: var(--primary); transform: translateY(-5px); }
 
-        footer h5 {
-            color: white;
-            font-weight: 700;
-            margin-bottom: 25px;
-            text-transform: uppercase;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
+        .btn-premium { background: var(--primary); color: white; border-radius: 50px; padding: 12px 30px; border: none; font-weight: 700; transition: 0.3s; }
+        .btn-premium:hover { background: #4f46e5; transform: scale(1.05); }
+        
+        /* ============ Ticket Styling ============ */
+        #ticket-print-area {
+            background-color: white !important;
+            color: black !important;
+            position: relative;
         }
-
-        .footer-link {
-            color: #94a3b8;
-            text-decoration: none;
-            transition: all 0.3s;
-            display: block;
-            margin-bottom: 12px;
-            font-size: 0.95rem;
-        }
-
-        .footer-link:hover {
-            color: var(--gold);
-            padding-left: 8px; /* Adjusted for LTR */
-        }
-
-        /* ============ Modals ============ */
-        .modal-content {
-            border: none;
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-        }
-
-        .modal-header {
-            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
-            color: white;
-            border: none;
-            padding: 30px;
-            border-radius: 24px 24px 0 0;
-        }
-
-        /* ============ Buttons ============ */
-        .btn-primary-custom {
-            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 12px 32px;
+        .ticket-container {
+            width: 100%;
+            max-width: 400px;
+            margin: auto;
+            background: #ffffff;
             border-radius: 25px;
-            transition: all 0.3s;
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
-
-        .btn-primary-custom:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+        .ticket-top {
+            background: linear-gradient(135deg, #6366f1, #4338ca);
+            padding: 25px;
             color: white;
         }
-
-        /* ============ Details Modal ============ */
-        #eventDetailsModal {
-            border-radius: 24px;
+        .ticket-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 50px;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
         }
-
-        .detail-image {
-            border-radius: 20px;
-            overflow: hidden;
-            margin-bottom: 20px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+        .ticket-body {
+            padding: 30px;
+            position: relative;
+            background: #fff;
         }
-
-        #map {
-            height: 300px;
-            border-radius: 20px;
-            margin: 20px 0;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: 1px solid var(--border-color);
+        .event-title {
+            color: #1e293b;
+            font-weight: 800;
+            font-size: 1.4rem;
         }
-
-        /* ============ Responsive ============ */
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 2.5rem;
-            }
-
-            .search-section {
-                margin: -40px auto 60px;
-            }
-
-            .event-card:hover {
-                transform: translateY(-8px);
-            }
-        }
-
-        /* ============ Loading ============ */
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 60px;
-        }
-
-        .loading.active {
+        .ticket-body label {
+            font-size: 11px;
+            color: #94a3b8;
+            text-transform: uppercase;
             display: block;
+            margin-bottom: 2px;
+        }
+        .ticket-divider {
+            height: 2px;
+            border-top: 2px dashed #e2e8f0;
+            margin: 25px -30px;
+            position: relative;
+        }
+        .ticket-divider .circle {
+            width: 20px;
+            height: 20px;
+            background: #f8fafc; /* Matches page background */
+            border-radius: 50%;
+            position: absolute;
+            top: -11px;
+        }
+        .ticket-divider .circle.left { left: -10px; }
+        .ticket-divider .circle.right { right: -10px; }
+
+        .qr-wrapper img {
+            margin: auto;
+            border: 5px solid #f8fafc;
+            border-radius: 10px;
+        }
+        .ticket-serial {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: #cbd5e1;
         }
     </style>
 </head>
@@ -464,217 +176,295 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="index.html">
-                <i class="fas fa-star"></i> Event<span>Hub</span> Fès
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <a class="navbar-brand" href="index.html">EVENT<span>HUB</span> Fès</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav me-auto ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
                     <li class="nav-item"><a class="nav-link" href="#events">Événements</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#categories">Catégories</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#about">À propos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#footer">À Propos</a></li>
                 </ul>
-                <div id="auth-buttons" class="ms-3"></div>
+                <div id="auth-buttons" class="d-flex gap-2">
+                    <button class="btn btn-outline-light rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
+                    <button class="btn btn-premium" data-bs-toggle="modal" data-bs-target="#registerModal">Inscription</button>
+                </div>
             </div>
         </div>
     </nav>
 
     <section class="hero">
-        <div class="hero-content">
-            <h1>Découvrez les meilleurs événements à <span>Fès</span></h1>
-            <p>Rejoignez des milliers de personnes et vivez des expériences inoubliables</p>
+        <div class="container" data-aos="fade-up">
+            <h1 class="display-2 fw-bold mb-3">Découvrez la magie de <span>Fès</span></h1>
+            <p class="fs-4 fw-light opacity-75">Les meilleures expériences culturelles et藝術iques en un clic.</p>
         </div>
     </section>
 
-    <div class="container search-section">
-        <form class="search-box" id="search-form">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" class="form-control" id="search-input" placeholder="Rechercher un événement...">
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-calendar"></i></span>
-                        <input type="date" class="form-control" id="date-input">
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-search w-100">
-                        <i class="fas fa-search"></i> Rechercher
-                    </button>
-                </div>
+    <div class="container" style="max-width: 950px; position: relative; z-index: 10;">
+        <form class="search-box d-flex align-items-center gap-3 shadow-lg" id="search-form">
+            <div class="flex-grow-1">
+                <input type="text" id="search-input" class="form-control" placeholder="Nom de l'événement, lieu...">
             </div>
+            <div class="border-start h-100 mx-2" style="min-height: 30px;"></div>
+            <div>
+                <select id="category-select" class="form-select border-0 text-muted" style="cursor: pointer;">
+                    <option value="">Toutes catégories</option>
+                    <option value="culture">Culture</option>
+                    <option value="musique">Musique</option>
+                    <option value="art">Art & Cinéma</option>
+                </select>
+            </div>
+            <div class="border-start h-100 mx-2" style="min-height: 30px;"></div>
+            <div>
+                <input type="date" id="date-input" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-primary rounded-circle p-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;" aria-label="Rechercher">
+                <i class="fas fa-search"></i>
+            </button>
         </form>
     </div>
 
-    <section class="categories-section" id="categories">
-        <div class="container">
-            <h2 style="margin-bottom: 40px; color: var(--dark);">Choisissez votre catégorie préférée</h2>
-            <div id="categories-nav">
-                <div class="category-pill active" onclick="filterByCategory('all', this)">Tout</div>
-            </div>
+    <section class="container my-5" id="categories-section">
+        <div class="text-center mb-5">
+            <h6 class="text-primary fw-bold text-uppercase small" style="letter-spacing: 3px;">Explorer</h6>
+            <h2 class="display-6 fw-bold">Parcourez par Catégorie</h2>
         </div>
+        <div class="d-flex justify-content-center gap-4 flex-wrap" id="categories-container"></div>
     </section>
 
-    <section id="events" class="py-5">
-        <div class="container">
-            <h2 style="margin-bottom: 50px; color: var(--dark);">
-                <i class="fas fa-calendar-check"></i> Événements à venir
-            </h2>
-            <div id="loading-spinner" class="loading active text-center">
-                <div class="spinner-border" role="status">
-                    <span class="visually-hidden">Chargement...</span>
-                </div>
-                <p class="mt-3 text-muted">Chargement des événements...</p>
+    <section class="container py-5" id="events">
+        <h2 class="fw-bold mb-5 text-center">Événements à la une</h2>
+        <div id="loading-spinner" class="text-center d-none my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
             </div>
-            <div id="events-container" class="row g-4"></div>
         </div>
+        <div id="events-container" class="row g-4"></div>
     </section>
 
-    <div class="modal fade" id="eventDetailsModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 id="detail-title">Détails de l'événement</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-5">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="detail-image">
-                                <img id="detail-image" src="" alt="Événement" class="w-100">
-                            </div>
-                            <h4 id="detail-description" class="text-muted mt-4"></h4>
+    <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4 overflow-hidden shadow-lg">
+                <div class="modal-body p-0">
+                    <div class="row g-0">
+                        <div class="col-lg-6">
+                            <img id="detail-image" src="" alt="Détails de l'événement" class="w-100 h-100 object-fit-cover" style="min-height: 450px;">
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-4">
-                                <h5 class="text-muted mb-2">
-                                    <i class="fas fa-map-marker-alt text-primary"></i> Emplacement
-                                </h5>
-                                <p id="detail-venue" class="fw-bold"></p>
+                        <div class="col-lg-6 p-5">
+                            <button type="button" class="btn-close float-end" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                            <h2 id="detail-title" class="fw-bold mb-3"></h2>
+                            <p class="text-primary fw-bold mb-4"><i class="fas fa-calendar-day me-2"></i> <span id="detail-date"></span></p>
+                            <p id="detail-description" class="text-muted mb-4"></p>
+                            
+                            <h6 class="fw-bold text-uppercase small text-muted mb-2">Localisation</h6>
+                            <div id="map" style="height: 250px; border-radius: 15px; border: 1px solid #eee;"></div>
+                            
+                            <div class="mt-4">
+                                <h6 class="fw-bold text-uppercase small text-muted mb-2">Avis des membres (4.9/5)</h6>
+                                <div class="text-warning mb-4">
+                                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                                </div>
                             </div>
-                            <div class="mb-4">
-                                <h5 class="text-muted mb-2">
-                                    <i class="fas fa-calendar text-primary"></i> Date et heure
-                                </h5>
-                                <p id="detail-date" class="fw-bold"></p>
+
+                            <div class="d-flex justify-content-between align-items-center pt-4 border-top">
+                                <h3 id="detail-price" class="fw-bold text-primary mb-0"></h3>
+                                <div id="booking-area"></div>
                             </div>
-                            <div class="mb-4">
-                                <h5 class="text-muted mb-2">
-                                    <i class="fas fa-money-bill-alt text-primary"></i> Prix
-                                </h5>
-                                <p id="detail-price" class="fw-bold" style="font-size: 1.5rem; color: var(--primary);"></p>
-                            </div>
-                            <div id="map"></div>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer border-0 bg-light rounded-bottom">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="btn btn-primary-custom" id="book-btn">Réserver maintenant</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="loginModal" tabindex="-1">
+    <div id="chatbot-container">
+        <div id="chat-button" title="Besoin d'aide ?"><i class="fas fa-robot"></i></div>
+        <div id="chat-window" class="shadow-lg border-0">
+            <div class="bg-primary text-white p-3 d-flex justify-content-between align-items-center">
+                <span class="fw-bold"><i class="fas fa-circle text-success me-2 small"></i>Assistant EventHub</span>
+                <i class="fas fa-times" style="cursor:pointer" id="close-chat"></i>
+            </div>
+            <div id="chat-messages" class="flex-grow-1 p-3 overflow-auto bg-light" style="display:flex; flex-direction:column; gap:10px;">
+                <div class="bg-white p-2 rounded shadow-sm" style="align-self: flex-start; max-width: 80%;">Bonjour ! Comment puis-je vous aider aujourd'hui ?</div>
+            </div>
+            <form id="chat-form" class="p-2 border-top d-flex">
+                <input type="text" id="chat-input" class="form-control border-0 bg-light" placeholder="Posez votre question...">
+                <button type="submit" class="btn text-primary"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content rounded-4">
                 <div class="modal-header">
-                    <h5>Connexion</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold" id="loginModalLabel">Connexion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body">
                     <form id="login-form">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Adresse e-mail</label>
-                            <input type="email" class="form-control" id="login-email" required>
+                            <label for="login-email" class="form-label">Email</label>
+                            <input type="email" id="login-email" class="form-control" required>
                         </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Mot de passe</label>
-                            <input type="password" class="form-control" id="login-password" required>
+                        <div class="mb-3">
+                            <label for="login-password" class="form-label">Mot de passe</label>
+                            <input type="password" id="login-password" class="form-control" required>
                         </div>
-                        <button type="submit" class="btn btn-primary-custom w-100">Se connecter</button>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill">Se connecter</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="registerModal" tabindex="-1">
+    <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content rounded-4">
                 <div class="modal-header">
-                    <h5>Créer un compte</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold" id="registerModalLabel">Inscription</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <form id="register-form">
+                <div class="modal-body">
+                    <form id="register-form"> 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Nom complet</label>
-                            <input type="text" class="form-control" id="register-name" required>
+                            <label for="register-name" class="form-label">Nom complet</label>
+                            <input type="text" id="register-name" class="form-control" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Adresse e-mail</label>
-                            <input type="email" class="form-control" id="register-email" required>
+                            <label for="register-email" class="form-label">Email</label>
+                            <input type="email" id="register-email" class="form-control" required>
                         </div>
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Mot de passe</label>
-                            <input type="password" class="form-control" id="register-password" required minlength="8">
+                        <div class="mb-3">
+                            <label for="register-password" class="form-label">Mot de passe</label>
+                            <input type="password" id="register-password" class="form-control" required minlength="8">
                         </div>
-                        <button type="submit" class="btn btn-primary-custom w-100">S'inscrire</button>
+                        <button type="submit" class="btn btn-success w-100 rounded-pill">Créer un compte</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer>
-        <div class="container">
-            <div class="row mb-5">
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <h5>À propos d'EventHub</h5>
-                    <p class="small">La première plateforme de réservation d'événements à Fès. Découvrez les meilleures activités et événements culturels.</p>
-                    <div class="mt-3">
-                        <a href="#" class="text-gold me-3"><i class="fab fa-facebook-f"></i></a>
-                        <a href="#" class="text-gold me-3"><i class="fab fa-twitter"></i></a>
-                        <a href="#" class="text-gold"><i class="fab fa-instagram"></i></a>
+    <div class="modal fade" id="ticketModal" tabindex="-1" aria-labelledby="ticketModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-dark" style="border-radius: 16px; border: none; background: #ffffff;">
+                <div class="modal-header bg-light" style="border-bottom: none; border-top-left-radius: 16px; border-top-right-radius: 16px;">
+                    <h5 class="modal-title fw-bold" id="ticketModalLabel" style="color: #0f172a;">
+                        <i class="fas fa-ticket-alt text-primary me-2"></i>Votre Ticket d'Accès
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center" style="background: #ffffff;">
+                    <div id="ticket-print-area" class="ticket-container shadow-sm">
+                        <div class="ticket-top">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="ticket-badge">VIP Pass</span>
+                                <h3 class="m-0 h5 fw-bold text-white">EVENT<span style="color:var(--gold)">HUB</span></h3>
+                            </div>
+                        </div>
+                        <div class="ticket-body text-start">
+                            <h4 id="ticket-event-title" class="event-title mb-3"></h4>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label>Nom</label>
+                                    <span id="ticket-user-name" class="fw-bold small text-dark"></span>
+                                </div>
+                                <div class="col-6">
+                                    <label>Date</label>
+                                    <span id="ticket-event-date" class="fw-bold small text-dark"></span>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label>Email</label>
+                                <span id="ticket-user-email" class="fw-bold small text-dark"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label>Lieu</label>
+                                <span id="ticket-event-location" class="fw-bold small text-dark"></span>
+                            </div>
+                            
+                            <div class="ticket-divider">
+                                <div class="circle left"></div>
+                                <div class="circle right"></div>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div id="modal-qrcode-target" class="d-inline-block p-2 bg-white border rounded mb-2" style="width: 130px; height: 130px;"></div>
+                                <br>
+                                <span id="ticket-price-badge" class="badge bg-dark px-3 py-2 rounded-pill fs-6 mt-2"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <h5>Liens rapides</h5>
-                    <a href="#" class="footer-link">Événements</a>
-                    <a href="#" class="footer-link">À propos</a>
-                    <a href="#" class="footer-link">Contactez-nous</a>
-                    <a href="dashboard.html" class="footer-link">Tableau de bord</a>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <h5>Support</h5>
-                    <a href="#" class="footer-link">FAQ</a>
-                    <a href="#" class="footer-link">Conditions d'utilisation</a>
-                    <a href="#" class="footer-link">Politique de confidentialité</a>
-                </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <h5>Contact</h5>
-                    <p class="small"><i class="fas fa-phone"></i> +212 5 35 62 89 34</p>
-                    <p class="small"><i class="fas fa-envelope"></i> contact@eventhub.ma</p>
-                    <p class="small"><i class="fas fa-map-marker-alt"></i> Fès, Maroc</p>
+                <div class="modal-footer bg-light" style="border-top: none; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; justify-content: center;">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Fermer</button>
+                    <button type="button" id="download-ticket-btn" class="btn btn-primary rounded-pill px-4 fw-bold">
+                        <i class="fas fa-download me-2"></i>Télécharger PDF
+                    </button>
                 </div>
             </div>
-            <hr class="opacity-25">
-            <p class="text-center small mt-4">&copy; 2026 EventHub Fès. Tous droits réservés.</p>
+        </div>
+    </div>
+
+    <footer class="footer-premium" id="footer">
+        <div class="container">
+            <div class="row g-5">
+                <div class="col-lg-4">
+                    <h3>EVENT<span>HUB</span> Fès</h3>
+                    <p class="mt-4 lh-lg">Découvrez, réservez et vivez les événements les plus prestigieux de Fès. Nous connectons la passion à l'expérience.</p>
+                    <div class="mt-4">
+                        <a href="#" class="social-icon" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="social-icon" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-icon" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="social-icon" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    </div>
+                </div>
+                <div class="col-lg-2">
+                    <h5 class="text-white fw-bold mb-4">Navigation</h5>
+                    <a href="index.html" class="footer-link">Accueil</a>
+                    <a href="#events" class="footer-link">Événements</a>
+                    <a href="#footer" class="footer-link">À Propos</a>
+                </div>
+                <div class="col-lg-3">
+                    <h5 class="text-white fw-bold mb-4">Contact</h5>
+                    <p class="small mb-2"><i class="fas fa-map-marker-alt text-primary me-2"></i> Ville Nouvelle, Fès, Maroc</p>
+                    <p class="small mb-2"><i class="fas fa-phone-alt text-primary me-2"></i> +212 535 11 22 33</p>
+                    <p class="small"><i class="fas fa-envelope text-primary me-2"></i> support@eventhub.ma</p>
+                </div>
+                <div class="col-lg-3">
+                    <h5 class="text-white fw-bold mb-4">Newsletter</h5>
+                    <p class="small mb-4">Inscrivez-vous pour ne rien rater des exclusivités.</p>
+                    <div class="input-group">
+                        <input type="email" class="form-control border-0 rounded-start-pill ps-3" placeholder="Votre Email" aria-label="Votre Email">
+                        <button type="button" class="btn btn-primary rounded-end-pill px-3">OK</button>
+                    </div>
+                </div>
+            </div>
+            <hr class="my-5 opacity-10">
+            <p class="text-center small mb-0">&copy; 2026 EventHub Fès. Tous droits réservés.</p>
         </div>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>AOS.init({ duration: 800, once: true });</script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <script src="js/app.js"></script>
-
+    
+    <script>
+        AOS.init({ duration: 800, once: true });
+        
+        function toggleChat() {
+            const win = document.getElementById('chat-window');
+            win.style.display = (win.style.display === 'flex') ? 'none' : 'flex';
+        }
+        document.getElementById('chat-button').onclick = toggleChat;
+        document.getElementById('close-chat').onclick = toggleChat;
+    </script>
 </body>
-</html>
+</html
