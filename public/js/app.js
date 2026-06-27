@@ -186,9 +186,6 @@ function setupAuthForms() {
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             
-            
-          
-
             if (!email || !password) {
                 Swal.fire('Erreur', 'Veuillez remplir tous les champs', 'error');
                 return;
@@ -205,8 +202,6 @@ function setupAuthForms() {
                 });
                 
                 const data = await response.json();
-
-            
                 
                 if (data.success && data.data.token && data.data.user) {
                     console.log('Login réussi:', data);
@@ -642,3 +637,47 @@ window.logout = logout;
 window.getCurrentUser = getCurrentUser;
 window.isLoggedIn = isLoggedIn;
 window.applyAllFilters = applyAllFilters;
+
+// ==========================================
+// 13. SCRIPT INJECTÉ DE CORRECTION (FETCH DYNAMIQUE)
+// ==========================================
+async function fetchAndAppendAPIEvents() {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/events', {
+            headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+            const resData = await response.json();
+            const realEvents = resData.data || resData;
+            
+            if (Array.isArray(realEvents) && realEvents.length > 0) {
+                realEvents.forEach(apiEv => {
+                    // تفادي التكرار إذا كان الحدث موجوداً مسبقاً بالمصفوفة الثابتة
+                    if (!EVENTS.some(e => e.id === apiEv.id)) {
+                        EVENTS.push({
+                            id: apiEv.id,
+                            title: apiEv.title,
+                            category: apiEv.category,
+                            date: apiEv.date,
+                            price: parseFloat(apiEv.price) || 0,
+                            description: apiEv.description,
+                            image: apiEv.image || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000",
+                            location: typeof apiEv.location === 'string' ? JSON.parse(apiEv.location) : (apiEv.location || { name: "Fès", lat: 34.0342, lng: -5.0012 })
+                        });
+                    }
+                });
+                // تحديث الواجهة فوراً بالأحداث الجديدة
+                if (typeof renderEvents === 'function') {
+                    renderEvents(EVENTS);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Erreur lors du chargement des événements réels:', err);
+    }
+}
+
+// التنفيذ المباشر فور التحميل بدون التأثير على الـ DOMContentLoaded الأصلي
+document.addEventListener("DOMContentLoaded", () => {
+    fetchAndAppendAPIEvents();
+});

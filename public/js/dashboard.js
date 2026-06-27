@@ -19,8 +19,6 @@ document.addEventListener('DOMContentLoaded', (e) => {
     // 1. التحقق من التوكن والبيانات (معالجة Corruption)
     if (!token) {
         console.warn("Session expirée ou invalide");
-
-
         logout();
         return;
     }
@@ -189,36 +187,40 @@ function viewTicket(ref) {
 }
 
 // ==========================================
-// 5. Mes Événements (Organizer + Admin)
+// 5. Mes Événements (Organizer + Admin) - CRUD شامل
 // ==========================================
 async function loadMyEvents() {
     const tbody = document.getElementById('events-table');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     let myEvents = [];
 
     try {
         let page = 1, lastPage = 1;
-        // الـ API ماعندهاش endpoint مخصص لـ "événements ديالي"، فكنجمعو الصفحات
-        // العامة ونفلتريو حسب organizer_id فالـ Front (limite: 5 صفحات = 60 événement)
         do {
             const res = await fetch(`${API_URL}/events?page=${page}`);
             const result = await res.json();
             const events = result.data || [];
-            myEvents = myEvents.concat(events.filter(ev => ev.organizer && ev.organizer.id === user.id));
+            
+            if (user.role === 'admin') {
+                myEvents = myEvents.concat(events);
+            } else {
+                myEvents = myEvents.concat(events.filter(ev => ev.organizer && ev.organizer.id === user.id));
+            }
+            
             lastPage = result.pagination?.last_page || 1;
             page++;
         } while (page <= lastPage && page <= 5);
     } catch (err) {
         console.error("Erreur chargement événements:", err);
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Erreur de chargement</td></tr>';
         return;
     }
 
     if (myEvents.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aucun événement pour le moment.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Aucun événement pour le moment.</td></tr>';
         return;
     }
 
@@ -229,8 +231,110 @@ async function loadMyEvents() {
             <td>${new Date(ev.start_date).toLocaleDateString('fr-FR')}</td>
             <td>${ev.city || '-'}</td>
             <td>${ev.is_free ? 'Gratuit' : `${ev.price} DH`}</td>
+            <td>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-warning" onclick="editEvent(${ev.id}, '${escapeHtml(ev.title)}', '${escapeHtml(ev.city || '')}', ${ev.price || 0}, ${ev.category ? ev.category.id : 'null'}, '${ev.start_date ? ev.start_date.substring(0,10) : ''}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteEvent(${ev.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
         </tr>
     `).join('');
+}
+
+// دالة مساعدة لحماية نصوص HTML عند تمريرها كـ Parameters
+function escapeHtml(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+async function editEvent(id, currentTitle, currentCity, currentPrice, currentCategoryId, currentDate) {
+    // جلب الأصناف أولاً لكي نعرضها في القائمة المنسدلة للتعديل
+    let categoriesOptions = '';
+    try {
+        const catRes = await fetch(`${API_URL}/categories`);
+        const catResult = await catRes.json();
+        categoriesOptions = (catResult.data || []).map(c => 
+            `<option value="${c.id}" ${c.id == currentCategoryId ? 'selected' : ''}>${c.name}</option>`
+        ).join('');
+    } catch (err) {
+        console.error("Erreur catégories", err);
+    }
+
+    const { value: formValues } = await Swal.fire({
+        title: 'Modifier l\'événement',
+        html: `
+            <div class="text-start mb-2"><label class="small fw-bold">Titre :</label>
+            <input id="swal-title" class="swal2-input m-0 w-100" value="${currentTitle}"></div>
+            
+            <div class="text-start mb-2"><label class="small fw-bold">Ville :</label>
+            <input id="swal-city" class="swal2-input m-0 w-100" value="${currentCity}"></div>
+            
+            <div class="text-start mb-2"><label class="small fw-bold">Prix (DH) :</label>
+            <input id="swal-price" type="number" class="swal2-input m-0 w-100" value="${currentPrice}"></div>
+            
+            <div class="text-start mb-2"><label class="small fw-bold">Date :</label>
+            <input id="swal-date" type="date" class="swal2-input m-0 w-100" value="${currentDate}"></div>
+            
+            <div class="text-start mb-2"><label class="small fw-bold">Catégorie :</label>
+            <select id="swal-category" class="swal2-input m-0 w-100" style="display: block;">
+                ${categoriesOptions}
+            </select></div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Enregistrer',
+        cancelButtonText: 'Annuler',
+        preConfirm: () => {
+            return {
+                title: document.getElementById('swal-title').value,
+                city: document.getElementById('swal-city').value,
+                price: document.getElementById('swal-price').value,
+                start_date: document.getElementById('swal-date').value,
+                category_id: document.getElementById('swal-category').value
+            }
+        }
+    });
+
+    if (!formValues) return;
+
+    // إرسال طلب التعديل (PUT / PATCH) عبر API
+    const res = await fetchWithAuth(`/events/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(formValues)
+    });
+
+    if (res && res.ok) {
+        Swal.fire('Succès', 'Événement modifié avec succès !', 'success');
+        loadMyEvents(); // تحديث الجدول تلقائياً
+    } else {
+        Swal.fire('Erreur', 'Impossible de modifier l\'événement', 'error');
+    }
+}
+
+async function deleteEvent(id) {
+    const confirmResult = await Swal.fire({
+        title: 'Supprimer cet événement ?',
+        text: 'Toutes les réservations associées seront impactées.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Supprimer',
+        cancelButtonText: 'Annuler',
+        confirmButtonColor: '#ef4444'
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    const res = await fetchWithAuth(`/events/${id}`, { method: 'DELETE' });
+    
+    if (res && res.ok) {
+        Swal.fire('Supprimé', 'L\'événement a été supprimé.', 'success');
+        loadMyEvents(); // تحديث الجدول تلقائياً
+    } else {
+        Swal.fire('Erreur', 'Erreur lors de la suppression de l\'événement', 'error');
+    }
 }
 
 // ==========================================
@@ -424,4 +528,147 @@ function updateText(id, text) {
 function logout() {
     localStorage.clear();
     window.location.href = 'index.html';
-}
+} 
+
+// ==========================================
+// 10. نافذة ماسح QR المتقدمة (Admin Premium UI)
+// ==========================================
+(function initPremiumQRScanner() {
+    // 1. تحميل المكتبة اللازمة
+    const script = document.createElement('script');
+    script.src = "https://unpkg.com/html5-qrcode";
+    document.head.appendChild(script);
+
+    // 2. إضافة التنسيقات الجمالية (CSS)
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .scanner-modal .modal-content {
+            background: #1a1d21;
+            color: white;
+            border: 1px solid #3d444d;
+            border-radius: 20px;
+        }
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 2px solid #6366f1;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+        #reader {
+            width: 100% !important;
+            border: none !important;
+        }
+        /* خط المسح المتحرك */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #22c55e;
+            box-shadow: 0 0 15px #22c55e;
+            z-index: 10;
+            animation: moveScanLine 2s linear infinite;
+        }
+        @keyframes moveScanLine {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        .scan-btn-float {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            z-index: 1050;
+            padding: 15px 25px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4);
+        }
+        .scan-btn-float:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 25px rgba(99, 102, 241, 0.6);
+        }
+    `;
+    document.head.appendChild(style);
+
+    script.onload = () => {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.role !== 'admin') return;
+
+        // 3. إنشاء النافذة (HTML Modal)
+        const modalHTML = `
+            <div class="modal fade scanner-modal" id="adminScannerModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content text-center">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title w-100 fw-bold">Vérification du Ticket</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="btn-close-scanner"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <p class="text-muted small mb-4">Placez le QR code à l'intérieur du cadre pour scanner</p>
+                            <div class="scanner-container">
+                                <div class="scan-line"></div>
+                                <div id="reader"></div>
+                            </div>
+                            <div id="scanner-status" class="mt-3 small text-info">Initialisation de la caméra...</div>
+                        </div>
+                        <div class="modal-footer border-0 justify-content-center pb-4">
+                            <button type="button" class="btn btn-outline-light rounded-pill px-4" data-bs-dismiss="modal">Annuler</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary rounded-pill scan-btn-float fw-bold" id="trigger-scan-btn">
+                <i class="fas fa-expand me-2"></i> SCANNER TICKET
+            </button>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        let html5QrCode;
+        const scannerModal = new bootstrap.Modal(document.getElementById('adminScannerModal'));
+
+        document.getElementById('trigger-scan-btn').onclick = () => {
+            scannerModal.show();
+            document.getElementById('scanner-status').innerText = "Caméra active...";
+            
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText) => {
+                    html5QrCode.stop();
+                    scannerModal.hide();
+                    
+                    Swal.fire({
+                        title: 'Ticket Validé !',
+                        html: `
+                            <div class="text-start">
+                                <p class="mb-1 text-muted small">Données du ticket :</p>
+                                <div class="p-3 bg-light rounded border text-dark font-monospace">${decodedText}</div>
+                            </div>
+                        `,
+                        icon: 'success',
+                        confirmButtonText: 'Terminer',
+                        confirmButtonColor: '#22c55e'
+                    });
+                }
+            ).catch(err => {
+                document.getElementById('scanner-status').innerHTML = `<span class="text-danger">Erreur: Caméra introuvable</span>`;
+            });
+        };
+
+        document.getElementById('adminScannerModal').addEventListener('hidden.bs.modal', () => {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop();
+            }
+        });
+    };
+})();
