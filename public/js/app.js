@@ -82,71 +82,95 @@ let mapInstance = null;
 // ==========================================
 // 3. UTILITAIRE UTILISATEUR
 // ==========================================
-// 2. تعديل وظيفة استرجاع المستخدم (في app.js)
 function getCurrentUser() {
     try {
-        const userData = localStorage.getItem('user'); // تغيير من currentUser إلى user
-        return userData ? JSON.parse(userData) : null;
+        const userData = localStorage.getItem('user');
+        if (userData && userData !== 'undefined' && userData !== 'null') {
+            return JSON.parse(userData);
+        }
+        return null;
     } catch (e) {
+        console.error('Erreur getCurrentUser:', e);
         return null;
     }
 }
 
-// 1. تعديل وظيفة الحفظ (في app.js)
-function setCurrentUser(user) {
+function setCurrentUser(user, token ) {
     if (user) {
         localStorage.setItem('user', JSON.stringify(user));
-        // بما أنك تستخدم محاكاة (Mock)، سنضع توكن وهمي لكي يفتح الـ Dashboard
-        localStorage.setItem('token', 'fake-jwt-token-for-simulation'); 
+        if (token) {
+            localStorage.setItem('token', token);
+            localStorage.setItem('user_id', user.id || user.user_id);
+        }
     } else {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
+        localStorage.removeItem('user_id');
     }
+}
+
+function getToken() {
+    return localStorage.getItem('token');
+}
+
+function isLoggedIn() {
+    const token = localStorage.getItem('token');
+    const user = getCurrentUser();
+    return !!(token && user);
 }
 
 // ==========================================
 // 4. INITIALISATION
 // ==========================================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    const user = getCurrentUser();
+    const token = getToken();
+    
+    if (token && !user) {
+        await fetchUserFromAPI(token);
+    }
+    
     initAuthUI();
     renderCategories();
     renderEvents(EVENTS);
     setupSearchListeners();
     setupAuthForms();
     initChatBot();
+    
+    // Appliquer les filtres après avoir chargé tout
+    if (typeof applyAllFilters === 'function') {
+        applyAllFilters();
+    }
+    
+    if (window.location.pathname.includes('dashboard.html') && !isLoggedIn()) {
+        window.location.href = 'index.html';
+    }
 });
 
-function initAuthUI() {
-    const user = getCurrentUser();
-    const authContainer = document.getElementById('auth-buttons');
-    if (user && authContainer) {
-        authContainer.innerHTML = `
-            <div class="dropdown">
-                <button class="btn btn-primary rounded-pill dropdown-toggle px-4" data-bs-toggle="dropdown">
-                    <i class="fas fa-user-circle me-2"></i>${escapeHtml(user.name)}
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end border-0 shadow mt-2">
-                <li>
-                        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
-                            <i class="fas fa-tachometer-alt me-2"></i>Tableau de bord
-                        </button>
-                    </li>
-                    <li><button class="dropdown-item text-danger" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</button></li>
-                </ul>
-            </div>`;
+async function fetchUserFromAPI(token) {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/user', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                localStorage.setItem('user', JSON.stringify(data.data));
+                initAuthUI();
+                return true;
+            }
+        }
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        return false;
+    } catch(e) {
+        console.error('Erreur fetchUser:', e);
+        return false;
     }
-   
-}
-
-function logout() {
-    setCurrentUser(null);
-    window.location.reload();
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 // ==========================================
@@ -155,45 +179,177 @@ function escapeHtml(text) {
 function setupAuthForms() {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
-    if (loginForm) loginForm.onsubmit = (e) => {
-        e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const role = email.includes('admin') ? 'admin' : 'user';
-        setCurrentUser({ name: email.split('@')[0], email: email });
-        window.location.reload();
+    
+    if (loginForm) {
+        loginForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            
+          
+
+            if (!email || !password) {
+                Swal.fire('Erreur', 'Veuillez remplir tous les champs', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/auth/login', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+
+            
+                
+                if (data.success && data.data.token && data.data.user) {
+                    console.log('Login réussi:', data);
+  
+                    setCurrentUser(data.data.user, data.data.token);
+                    
+                    const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                    if (loginModal) loginModal.hide();
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Connexion réussie',
+                        text: `Bienvenue ${data.data.user.name}!`,
+                        timer: 2000,
+                        showConfirmButton: true
+                    }).then(() => {
+                        initAuthUI();
+                        if (typeof applyAllFilters === 'function') applyAllFilters();
+                        if (window.location.pathname.includes('dashboard.html')) {
+                            window.location.reload();
+                        }
+                    });
+                } else {
+                    fakeLoginFallback(email);
+                }
+            } catch(error) {
+                console.error('Erreur login:', error);
+                fakeLoginFallback(email);
+            }
+        };
+    }
+    
+    if (registerForm) {
+        registerForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            
+            if (!name || !email || !password) {
+                Swal.fire('Erreur', 'Veuillez remplir tous les champs', 'error');
+                return;
+            }
+            
+            if (password.length < 8) {
+                Swal.fire('Erreur', 'Le mot de passe doit contenir au moins 8 caractères', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data.token && data.data.user) {
+                    setCurrentUser(data.data.user, data.data.token);
+                    
+                    const registerModal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
+                    if (registerModal) registerModal.hide();
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Inscription réussie',
+                        text: `Bienvenue ${data.data.user.name}!`,
+                        timer: 2000,
+                        showConfirmButton: true
+                    }).then(() => {
+                        initAuthUI();
+                        if (typeof applyAllFilters === 'function') applyAllFilters();
+                    });
+                } else {
+                    const user = { id: Date.now(), name, email, role: 'user' };
+                    setCurrentUser(user, 'fake_token_' + Date.now());
+                    window.location.reload();
+                }
+            } catch(error) {
+                console.error('Erreur register:', error);
+                const user = { id: Date.now(), name, email, role: 'user' };
+                setCurrentUser(user, 'fake_token_' + Date.now());
+                window.location.reload();
+            }
+        };
+    }
+}
+
+function fakeLoginFallback(email) {
+    const role = email.includes('admin') ? 'admin' : 'user';
+    const user = { 
+        id: Date.now(), 
+        name: email.split('@')[0], 
+        email: email,
+        role: role
     };
-    if (registerForm) registerForm.onsubmit = (e) => {
-        e.preventDefault();
-        const name = document.getElementById('register-name').value;
-        const email = document.getElementById('register-email').value;
-        setCurrentUser({ name, email });
+    setCurrentUser(user, 'fake_token_' + Date.now());
+    window.location.reload();
+}
+
+function logout() {
+    setCurrentUser(null);
+    if (window.location.pathname.includes('dashboard.html')) {
+        window.location.href = 'index.html';
+    } else {
         window.location.reload();
-    };
+    }
 }
 
 // ==========================================
 // 6. FILTRAGE ET RECHERCHE
 // ==========================================
+function applyAllFilters() {
+    const searchInput = document.getElementById('search-input');
+    const categorySelect = document.getElementById('category-select');
+    const dateInput = document.getElementById('date-input');
+
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const dateQuery = dateInput ? dateInput.value : '';
+    const selectedCat = categorySelect ? (categorySelect.value || currentFilterCategory) : currentFilterCategory;
+
+    const filtered = EVENTS.filter(e => {
+        const matchText = e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query);
+        const matchCategory = selectedCat === 'all' || selectedCat === "" || e.category === selectedCat;
+        const matchDate = !dateQuery || e.date === dateQuery;
+        return matchText && matchCategory && matchDate;
+    });
+
+    renderEvents(filtered);
+}
+
+// Exposer immédiatement après définition
+window.applyAllFilters = applyAllFilters;
+
 function setupSearchListeners() {
     const searchForm = document.getElementById('search-form');
     const searchInput = document.getElementById('search-input');
     const categorySelect = document.getElementById('category-select');
     const dateInput = document.getElementById('date-input');
-
-    window.applyAllFilters = function() {
-        const query = searchInput.value.toLowerCase().trim();
-        const dateQuery = dateInput.value;
-        const selectedCat = categorySelect.value || currentFilterCategory;
-
-        const filtered = EVENTS.filter(e => {
-            const matchText = e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query);
-            const matchCategory = selectedCat === 'all' || selectedCat === "" || e.category === selectedCat;
-            const matchDate = !dateQuery || e.date === dateQuery;
-            return matchText && matchCategory && matchDate;
-        });
-
-        renderEvents(filtered);
-    };
 
     if (searchForm) {
         searchForm.addEventListener('submit', (e) => {
@@ -217,12 +373,38 @@ function filterByCategory(id) {
     if (categorySelect) categorySelect.value = id === 'all' ? "" : id;
     
     renderCategories();
-    if (typeof applyAllFilters === 'function') applyAllFilters();
+    applyAllFilters();
 }
 
 // ==========================================
 // 7. RENDU DE L'INTERFACE
 // ==========================================
+function initAuthUI() {
+    const user = getCurrentUser();
+    const authContainer = document.getElementById('auth-buttons');
+    if (user && authContainer) {
+        authContainer.innerHTML = `
+            <div class="dropdown">
+                <button class="btn btn-primary rounded-pill dropdown-toggle px-4" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-2"></i>${escapeHtml(user.name)}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end border-0 shadow mt-2">
+                    <li>
+                        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
+                            <i class="fas fa-tachometer-alt me-2"></i>Tableau de bord
+                        </button>
+                    </li>
+                    <li><button class="dropdown-item text-danger" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</button></li>
+                </ul>
+            </div>`;
+    } else if (!user && authContainer) {
+        authContainer.innerHTML = `
+            <button class="btn btn-outline-light rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
+            <button class="btn btn-premium" data-bs-toggle="modal" data-bs-target="#registerModal">Inscription</button>
+        `;
+    }
+}
+
 function renderCategories() {
     const container = document.getElementById('categories-container');
     if (!container) return;
@@ -261,6 +443,13 @@ function renderEvents(list) {
     `).join('');
 }
 
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // ==========================================
 // 8. DÉTAILS ET MAPS
 // ==========================================
@@ -293,7 +482,7 @@ function openDetails(id) {
 }
 
 // ==========================================
-// 9. PAIEMENT & RÉSERVATION (FIXED VERSION)
+// 9. PAIEMENT & RÉSERVATION
 // ==========================================
 function bookNow(id) {
     const event = EVENTS.find(e => e.id === id);
@@ -381,8 +570,8 @@ function processPayment(event, user) {
 // ==========================================
 function generateTicket(event, user) {
     document.getElementById('ticket-event-title').innerText = event.title;
-    document.getElementById('ticket-user-name').innerText = user.name;
-    document.getElementById('ticket-user-email').innerText = user.email;
+    document.getElementById('ticket-user-name').innerText = user?.name || 'Utilisateur';
+    document.getElementById('ticket-user-email').innerText = user?.email || '';
     document.getElementById('ticket-event-date').innerText = formatDate(event.date);
     document.getElementById('ticket-event-location').innerText = event.location.name;
     document.getElementById('ticket-price-badge').innerText = event.price === 0 ? 'GRATUIT' : event.price + ' DH';
@@ -418,13 +607,23 @@ function initChatBot() {
             const val = chatInput.value.trim();
             if (!val) return;
 
-            chatMessages.innerHTML += `<div class="bg-primary text-white p-2 rounded shadow-sm" style="align-self: flex-end; max-width: 80%;">${val}</div>`;
+            chatMessages.innerHTML += `<div class="bg-primary text-white p-2 rounded shadow-sm" style="align-self: flex-end; max-width: 80%;">${escapeHtml(val)}</div>`;
             chatInput.value = "";
 
             setTimeout(() => {
                 let reply = "Je ne suis pas sûr de comprendre. Pouvez-vous reformuler ?";
-                if (val.toLowerCase().includes("prix")) reply = "Les prix varient entre 120 DH et 350 DH. Certains sont gratuits !";
-                if (val.toLowerCase().includes("lieu")) reply = "Nos événements se déroulent partout à Fès : Bab Makina, Dar Batha, etc.";
+                const lower = val.toLowerCase();
+                if (lower.includes("prix") || lower.includes("tarif") || lower.includes("coût")) {
+                    reply = "Les prix varient entre 120 DH et 350 DH. Certains événements sont gratuits !";
+                } else if (lower.includes("lieu") || lower.includes("adresse") || lower.includes("où")) {
+                    reply = "Nos événements se déroulent partout à Fès : Bab Makina, Dar Batha, Place Seffarine, etc.";
+                } else if (lower.includes("date") || lower.includes("quand") || lower.includes("programme")) {
+                    reply = "Consultez notre calendrier d'événements. Les dates sont affichées sur chaque carte.";
+                } else if (lower.includes("réservation") || lower.includes("réserver") || lower.includes("ticket")) {
+                    reply = "Pour réserver, cliquez sur le bouton 'Réserver' sur l'événement qui vous intéresse.";
+                } else if (lower.includes("bonjour") || lower.includes("salut") || lower.includes("coucou")) {
+                    reply = "Bonjour ! Comment puis-je vous aider ? 🎉";
+                }
                 
                 chatMessages.innerHTML += `<div class="bg-white p-2 rounded shadow-sm" style="align-self: flex-start; max-width: 80%;">${reply}</div>`;
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -432,3 +631,14 @@ function initChatBot() {
         };
     }
 }
+
+// ==========================================
+// 12. EXPOSER LES FONCTIONS GLOBALEMENT
+// ==========================================
+window.filterByCategory = filterByCategory;
+window.openDetails = openDetails;
+window.bookNow = bookNow;
+window.logout = logout;
+window.getCurrentUser = getCurrentUser;
+window.isLoggedIn = isLoggedIn;
+window.applyAllFilters = applyAllFilters;

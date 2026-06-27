@@ -9,13 +9,15 @@
     <style>
         :root { --primary: #6366f1; --dark: #0f172a; }
         body { background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .sidebar { height: 100vh; width: 260px; position: fixed; background: var(--dark); color: white; padding-top: 20px; }
+        .sidebar { height: 100vh; width: 260px; position: fixed; background: var(--dark); color: white; padding-top: 20px; overflow-y: auto; }
         .nav-link { color: #94a3b8; padding: 12px 20px; cursor: pointer; text-decoration: none; display: block; }
         .nav-link:hover, .nav-link.active { background: var(--primary); color: white; border-radius: 8px; margin: 0 10px; }
         .main-content { margin-left: 260px; padding: 30px; }
         .dashboard-section { display: none; }
         .dashboard-section.active { display: block; }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .sidebar-divider { border-color: #334155; margin: 15px 20px; }
+        #user-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
     </style>
 </head>
 <body>
@@ -23,13 +25,20 @@
     <!-- Sidebar -->
     <div class="sidebar">
         <h4 class="text-center fw-bold mb-4">FestivEvents</h4>
+
         <a class="nav-link active" onclick="showSection('overview', event)"><i class="fas fa-home me-2"></i> Vue d'ensemble</a>
         <a class="nav-link" onclick="showSection('bookings', event)"><i class="fas fa-ticket-alt me-2"></i> Mes Réservations</a>
-        
-        <div id="organizer-menu" style="display:none">
-            <hr>
+
+        <div class="organizer-only" style="display:none">
+            <hr class="sidebar-divider">
             <a class="nav-link" onclick="showSection('my-events', event)"><i class="fas fa-calendar me-2"></i> Mes Événements</a>
             <a class="nav-link" onclick="showSection('add-event', event)"><i class="fas fa-plus me-2"></i> Ajouter Event</a>
+        </div>
+
+        <div class="admin-only" style="display:none">
+            <hr class="sidebar-divider">
+            <a class="nav-link" onclick="showSection('admin-stats', event)"><i class="fas fa-chart-pie me-2"></i> Statistiques Admin</a>
+            <a class="nav-link" onclick="showSection('admin-users', event)"><i class="fas fa-users-cog me-2"></i> Gestion Utilisateurs</a>
         </div>
 
         <a class="nav-link text-danger mt-5" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i> Déconnexion</a>
@@ -38,7 +47,10 @@
     <!-- Main -->
     <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 id="welcome-msg">Bonjour!</h2>
+            <div class="d-flex align-items-center gap-2">
+                <img id="user-avatar" src="" alt="avatar">
+                <h2 class="mb-0" id="welcome-msg">Bonjour!</h2>
+            </div>
             <div class="text-end">
                 <span class="badge bg-primary" id="user-role">Role</span>
                 <p class="small text-muted mb-0" id="user-email"></p>
@@ -47,7 +59,7 @@
 
         <!-- Section 1: Overview -->
         <div id="overview" class="dashboard-section active">
-            <div class="row g-4">
+            <div class="row g-4 mb-4">
                 <div class="col-md-4">
                     <div class="card p-4 bg-white">
                         <h6>Total Réservations</h6>
@@ -61,6 +73,10 @@
                     </div>
                 </div>
             </div>
+            <div class="card p-4">
+                <h6 class="mb-3">Tendance des réservations</h6>
+                <canvas id="bookings-chart" height="90"></canvas>
+            </div>
         </div>
 
         <!-- Section 2: Bookings -->
@@ -68,195 +84,138 @@
             <div class="card p-4">
                 <h4 class="mb-4">Mes Réservations</h4>
                 <table class="table">
-                    <thead><tr><th>ID</th><th>Événement</th><th>Date</th><th>Statut</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Événement</th><th>Date</th><th>Statut</th><th>Action</th></tr></thead>
                     <tbody id="bookings-table"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Section 3: My Events -->
+        <!-- Section 3: My Events (Organizer + Admin) -->
         <div id="my-events" class="dashboard-section">
             <div class="card p-4">
-                <h4>Mes Événements</h4>
+                <h4 class="mb-4">Mes Événements</h4>
                 <table class="table">
-                    <thead><tr><th>Titre</th><th>Date</th><th>Ventes</th></tr></thead>
+                    <thead><tr><th>Titre</th><th>Catégorie</th><th>Date</th><th>Ville</th><th>Prix</th></tr></thead>
                     <tbody id="events-table"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Section 4: Add Event -->
+        <!-- Section 4: Add Event (Organizer + Admin) -->
         <div id="add-event" class="dashboard-section">
             <div class="card p-4">
-                <h4>Ajouter un événement</h4>
+                <h4 class="mb-4">Ajouter un événement</h4>
                 <form id="add-event-form">
-                    <div class="mb-3"><label>Titre</label><input type="text" name="title" class="form-control" required></div>
-                    <div class="mb-3"><label>Capacité</label><input type="number" name="available_seats" class="form-control" required></div>
-                    <div class="mb-3"><label>Prix (DH)</label><input type="number" name="price" class="form-control" required></div>
-                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Titre</label>
+                            <input type="text" name="title" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Catégorie</label>
+                            <select id="category-select" name="category_id" class="form-select" required></select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Date et heure de début</label>
+                            <input type="datetime-local" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nom du lieu</label>
+                            <input type="text" name="venue_name" class="form-control" placeholder="Ex: Palais des Congrès" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Adresse du lieu</label>
+                            <input type="text" name="venue_address" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ville</label>
+                            <input type="text" name="city" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Prix (DH)</label>
+                            <input type="number" name="price" min="0" step="0.01" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Capacité max</label>
+                            <input type="number" name="max_attendees" min="1" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Image</label>
+                            <input type="file" name="image" accept="image/*" class="form-control">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-4">Enregistrer</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- Section 5: Admin Stats (Admin uniquement) -->
+        <div id="admin-stats" class="dashboard-section">
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card p-4 bg-white">
+                        <h6>Utilisateurs</h6>
+                        <h2 id="admin-total-users" class="fw-bold">0</h2>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-4 bg-white">
+                        <h6>Événements</h6>
+                        <h2 id="admin-total-events" class="fw-bold">0</h2>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-4 bg-white">
+                        <h6>Réservations</h6>
+                        <h2 id="admin-total-bookings" class="fw-bold">0</h2>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-4 bg-white">
+                        <h6>Revenu Total</h6>
+                        <h2 id="admin-total-revenue" class="fw-bold">0 DH</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-5">
+                    <div class="card p-4">
+                        <h6 class="mb-3">Répartition par catégorie</h6>
+                        <canvas id="categories-chart"></canvas>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card p-4">
+                        <h6 class="mb-3">Dernières réservations</h6>
+                        <table class="table table-sm">
+                            <thead><tr><th>ID</th><th>Client</th><th>Événement</th><th>Date</th></tr></thead>
+                            <tbody id="admin-recent-bookings"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 6: Admin Users Management (Admin uniquement) -->
+        <div id="admin-users" class="dashboard-section">
+            <div class="card p-4">
+                <h4 class="mb-4">Gestion des Utilisateurs</h4>
+                <table class="table">
+                    <thead><tr><th>ID</th><th>Nom</th><th>Email</th><th>Rôle</th><th>Action</th></tr></thead>
+                    <tbody id="users-table"></tbody>
+                </table>
+                <div id="users-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <script>
-    // استخدام var لتجنب أخطاء إعادة التعريف
-    var API_URL = "http://127.0.0.1:8000/api";
-
-    window.onload = function() {
-        const token = localStorage.getItem('token');
-        const userStr = localStorage.getItem('user');
-        
-        // إذا لم تكن هناك بيانات، ارجع لصفحة الدخول
-        if (!token || !userStr || userStr === "undefined") {
-            window.location.href = 'index.html';
-            return;
-        }
-
-        try {
-            const user = JSON.parse(userStr);
-            console.log("Utilisateur connecté:", user); // للتأكد من البيانات في Console
-
-            // تحديث بيانات الملف الشخصي مع حماية ضد القيم الفارغة
-            const name = user.name || 'Utilisateur';
-            const role = (user.role || 'user').toUpperCase(); // إصلاح مشكلة toUpperCase
-
-            document.getElementById('welcome-msg').innerText = `Bonjour, ${name} 👋`;
-            document.getElementById('user-email').innerText = user.email || '';
-            document.getElementById('user-role').innerText = role;
-
-            // إظهار قائمة المنظم بناءً على الرتبة
-            const lowerRole = (user.role || 'user').toLowerCase();
-            if (lowerRole === 'organizer' || lowerRole === 'admin') {
-                document.getElementById('organizer-menu').style.display = 'block';
-            }
-
-            // تحميل أول قسم
-            loadOverview();
-
-        } catch (e) {
-            console.error("Erreur parsing user:", e);
-            logout();
-        }
-    };
-
-    // دالة التنقل بين الأقسام
-    function showSection(sectionId, event) {
-        if(event) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-
-        console.log("Changement de section vers:", sectionId);
-
-        // تغيير حالة الروابط
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        // نحدد الزر الذي تم ضغطه
-        if(event && event.currentTarget) event.currentTarget.classList.add('active');
-
-        // إخفاء وإظهار الأقسام
-        document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
-        const target = document.getElementById(sectionId);
-        if(target) target.classList.add('active');
-
-        // جلب بيانات القسم المختار
-        if (sectionId === 'bookings') loadBookings();
-        if (sectionId === 'my-events') loadMyEvents();
-        if (sectionId === 'overview') loadOverview();
-    }
-
-    // دالة جلب البيانات (المحسنة)
-    async function fetchAPI(endpoint, method = 'GET', body = null) {
-        const token = localStorage.getItem('token');
-        
-        // تأكد من أن التوكن ليس نصاً فارغاً أو كلمة "null"
-        if (!token || token === "null") {
-            console.error("Token manquant!");
-            return null;
-        }
-
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-        };
-
-        let options = { method, headers };
-        
-        // إذا كان الجسم FormData (مثل رفع الصور)، لا نضع Content-Type يدوياً
-        if (body) {
-            options.body = body;
-        }
-
-        try {
-            const response = await fetch(`${API_URL}${endpoint}`, options);
-            
-            if (response.status === 401) {
-                console.error("401: Non autorisé. Vérifiez le Token.");
-                Swal.fire('Session expirée', 'Veuillez vous reconnecter', 'warning').then(() => {
-                    logout();
-                });
-                return null;
-            }
-            
-            return await response.json();
-        } catch (error) {
-            console.error("Erreur réseau:", error);
-            return null;
-        }
-    }
-
-    async function loadOverview() {
-        const result = await fetchAPI('/stats/overview');
-        if (result && result.data) {
-            document.getElementById('total-bookings').innerText = result.data.total_bookings || 0;
-            document.getElementById('total-events').innerText = result.data.total_events || 0;
-        }
-    }
-
-    async function loadBookings() {
-        const tbody = document.getElementById('bookings-table');
-        if(!tbody) return;
-        
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
-        
-        const result = await fetchAPI('/my-bookings');
-        if (result && result.data) {
-            if (result.data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center">Aucune réservation.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = result.data.map(b => `
-                <tr>
-                    <td>#${b.id}</td>
-                    <td>${b.event ? b.event.title : 'Event'}</td>
-                    <td>${new Date(b.created_at).toLocaleDateString()}</td>
-                    <td><span class="badge bg-success">${b.status}</span></td>
-                </tr>
-            `).join('');
-        }
-    }
-
-    async function loadMyEvents() {
-        const tbody = document.getElementById('events-table');
-        const result = await fetchAPI('/organizer/events');
-        if (result && result.data) {
-            tbody.innerHTML = result.data.map(e => `
-                <tr>
-                    <td>${e.title}</td>
-                    <td>${e.start_date}</td>
-                    <td>${e.bookings_count || 0}</td>
-                </tr>
-            `).join('');
-        }
-    }
-
-    function logout() {
-        localStorage.clear();
-        window.location.href = 'index.html';
-    }
-</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/dashboard.js"></script>
 </body>
 </html>
