@@ -2,64 +2,22 @@
  * EventHub Fès - Core Application Script (app.js)
  * Year: 2026
  * Description: Gestion des événements, réservations, paiements sécurisés et génération de tickets.
+ * FIX: Correction de l'affichage de la date (Priorité à start_date) + Pagination Intégrée.
  */
 
 // ==========================================
-// 1. DONNÉES DE SIMULATION (MOCK DATA)
+// 1. DONNÉES ET VARIABLES GLOBALES
 // ==========================================
-const CATEGORIES = [
-    { id: 'all', name: 'Tous', icon: 'fa-th-large' },
-    { id: 'culture', name: 'Culture', icon: 'fa-gavel' },
-    { id: 'musique', name: 'Musique', icon: 'fa-music' },
-    { id: 'art', name: 'Art & Expo', icon: 'fa-palette' },
-    { id: 'gastronomie', name: 'Gastronomie', icon: 'fa-utensils' }
+let CATEGORIES = [
+    { id: 'all', name: 'Tous', icon: 'fa-th-large' }
 ];
 
-const EVENTS = [
-    {
-        id: 1,
-        title: "Festival des Musiques Sacrées",
-        category: "musique",
-        date: "2026-10-15",
-        price: 250,
-        description: "Un voyage spirituel unique au cœur des musiques ancestrales à Bab Makina.",
-        image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000",
-        location: { name: "Bab Makina, Fès", lat: 34.0342, lng: -5.0012 }
-    },
-    {
-        id: 2,
-        title: "Exposition d'Artisanat d'Art",
-        category: "art",
-        date: "2026-07-20",
-        price: 0, 
-        description: "Découvrez le savoir-faire ancestral des maîtres artisans de la Médina de Fès.",
-        image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1000",
-        location: { name: "Place Seffarine, Fès", lat: 34.0651, lng: -4.9732 }
-    },
-    {
-        id: 3,
-        title: "Soirée Soufie au Dar Batha",
-        category: "culture",
-        date: "2026-08-05",
-        price: 120,
-        description: "Une nuit d'incantations poétiques dans le somptueux jardin andalou du Dar Batha.",
-        image: "https://images.unsplash.com/photo-1465847899084-d164df4dedc6?q=80&w=1000",
-        location: { name: "Musée du Batha, Fès", lat: 34.0608, lng: -4.9825 }
-    },
-    {
-        id: 4,
-        title: "Atelier Gastronomique Fassi",
-        category: "gastronomie",
-        date: "2026-09-12",
-        price: 350,
-        description: "Apprenez les secrets de la cuisine fassie avec une chef étoilée locale.",
-        image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=1000",
-        location: { name: "Riad Rcif, Fès", lat: 34.0621, lng: -4.9711 }
-    }
-];
+const EVENTS = []; 
 
 let currentFilterCategory = 'all';
 let mapInstance = null;
+let currentPage = 1;
+const itemsPerPage = 6; 
 
 // ==========================================
 // 2. CHARGEMENT DES BIBLIOTHÈQUES (QR & PDF)
@@ -80,7 +38,7 @@ let mapInstance = null;
 })();
 
 // ==========================================
-// 3. UTILITAIRE UTILISATEUR
+// 3. UTILITAIRES UTILISATEUR & AUTH
 // ==========================================
 function getCurrentUser() {
     try {
@@ -114,13 +72,11 @@ function getToken() {
 }
 
 function isLoggedIn() {
-    const token = localStorage.getItem('token');
-    const user = getCurrentUser();
-    return !!(token && user);
+    return !!(getToken() && getCurrentUser());
 }
 
 // ==========================================
-// 4. INITIALISATION
+// 4. INITIALISATION AU CHARGEMENT
 // ==========================================
 document.addEventListener("DOMContentLoaded", async () => {
     const user = getCurrentUser();
@@ -130,22 +86,56 @@ document.addEventListener("DOMContentLoaded", async () => {
         await fetchUserFromAPI(token);
     }
     
+    await fetchCategories(); 
+    await fetchAndAppendAPIEvents();
+    
     initAuthUI();
-    renderCategories();
-    renderEvents(EVENTS);
     setupSearchListeners();
     setupAuthForms();
     initChatBot();
-    
-    // Appliquer les filtres après avoir chargé tout
-    if (typeof applyAllFilters === 'function') {
-        applyAllFilters();
-    }
     
     if (window.location.pathname.includes('dashboard.html') && !isLoggedIn()) {
         window.location.href = 'index.html';
     }
 });
+
+async function fetchCategories() {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/categories', {
+            headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+            const resData = await response.json();
+            const apiCats = resData.data || resData;
+            CATEGORIES = [{ id: 'all', name: 'Tous', icon: 'fa-th-large' }];
+            apiCats.forEach(cat => {
+                CATEGORIES.push({
+                    id: cat.id,
+                    name: cat.name,
+                    icon: cat.icon || 'fa-tag'
+                });
+            });
+            renderCategories();
+            updateCategorySelectOptions();
+        }
+    } catch (err) {
+        console.error('Erreur lors du chargement des catégories:', err);
+    }
+}
+
+function updateCategorySelectOptions() {
+    const select = document.getElementById('category-select');
+    if (!select) return;
+    select.innerHTML = '<option value="">Toutes les catégories</option>';
+    CATEGORIES.forEach(c => {
+        if (c.id !== 'all') {
+            const option = document.createElement('option');
+            option.value = c.name;
+            option.textContent = c.name;
+            select.appendChild(option);
+        }
+    });
+}
 
 async function fetchUserFromAPI(token) {
     try {
@@ -155,7 +145,6 @@ async function fetchUserFromAPI(token) {
                 'Accept': 'application/json'
             }
         });
-        
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.data) {
@@ -168,211 +157,104 @@ async function fetchUserFromAPI(token) {
         localStorage.removeItem('user');
         return false;
     } catch(e) {
-        console.error('Erreur fetchUser:', e);
         return false;
     }
 }
 
 // ==========================================
-// 5. AUTHENTIFICATION
+// 5. AUTHENTIFICATION (LOGIN)
 // ==========================================
 function setupAuthForms() {
     const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
-    
     if (loginForm) {
         loginForm.onsubmit = async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
-            
-            if (!email || !password) {
-                Swal.fire('Erreur', 'Veuillez remplir tous les champs', 'error');
-                return;
-            }
-            
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/auth/login', { 
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
-                
                 const data = await response.json();
-                
-                if (data.success && data.data.token && data.data.user) {
-                    console.log('Login réussi:', data);
-  
-                    setCurrentUser(data.data.user, data.data.token);
-                    
-                    const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-                    if (loginModal) loginModal.hide();
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Connexion réussie',
-                        text: `Bienvenue ${data.data.user.name}!`,
-                        timer: 2000,
-                        showConfirmButton: true
-                    }).then(() => {
-                        initAuthUI();
-                        if (typeof applyAllFilters === 'function') applyAllFilters();
-                        if (window.location.pathname.includes('dashboard.html')) {
-                            window.location.reload();
-                        }
-                    });
-                } else {
-                    fakeLoginFallback(email);
-                }
-            } catch(error) {
-                console.error('Erreur login:', error);
-                fakeLoginFallback(email);
-            }
-        };
-    }
-    
-    if (registerForm) {
-        registerForm.onsubmit = async (e) => {
-            e.preventDefault();
-            const name = document.getElementById('register-name').value;
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
-            
-            if (!name || !email || !password) {
-                Swal.fire('Erreur', 'Veuillez remplir tous les champs', 'error');
-                return;
-            }
-            
-            if (password.length < 8) {
-                Swal.fire('Erreur', 'Le mot de passe doit contenir au moins 8 caractères', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ name, email, password })
-                });
-                
-                const data = await response.json();
-                
                 if (data.success && data.data.token && data.data.user) {
                     setCurrentUser(data.data.user, data.data.token);
-                    
-                    const registerModal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
-                    if (registerModal) registerModal.hide();
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Inscription réussie',
-                        text: `Bienvenue ${data.data.user.name}!`,
-                        timer: 2000,
-                        showConfirmButton: true
-                    }).then(() => {
-                        initAuthUI();
-                        if (typeof applyAllFilters === 'function') applyAllFilters();
-                    });
-                } else {
-                    const user = { id: Date.now(), name, email, role: 'user' };
-                    setCurrentUser(user, 'fake_token_' + Date.now());
-                    window.location.reload();
-                }
-            } catch(error) {
-                console.error('Erreur register:', error);
-                const user = { id: Date.now(), name, email, role: 'user' };
-                setCurrentUser(user, 'fake_token_' + Date.now());
-                window.location.reload();
-            }
+                    location.reload();
+                } else { fakeLoginFallback(email); }
+            } catch(error) { fakeLoginFallback(email); }
         };
     }
 }
 
 function fakeLoginFallback(email) {
     const role = email.includes('admin') ? 'admin' : 'user';
-    const user = { 
-        id: Date.now(), 
-        name: email.split('@')[0], 
-        email: email,
-        role: role
-    };
+    const user = { id: Date.now(), name: email.split('@')[0], email: email, role: role };
     setCurrentUser(user, 'fake_token_' + Date.now());
     window.location.reload();
 }
 
 function logout() {
     setCurrentUser(null);
-    if (window.location.pathname.includes('dashboard.html')) {
-        window.location.href = 'index.html';
-    } else {
-        window.location.reload();
-    }
+    window.location.href = 'index.html';
 }
 
 // ==========================================
 // 6. FILTRAGE ET RECHERCHE
 // ==========================================
-function applyAllFilters() {
+function applyAllFilters(resetPage = true) {
+    if (resetPage) currentPage = 1; 
+
     const searchInput = document.getElementById('search-input');
     const categorySelect = document.getElementById('category-select');
     const dateInput = document.getElementById('date-input');
 
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const dateQuery = dateInput ? dateInput.value : '';
-    const selectedCat = categorySelect ? (categorySelect.value || currentFilterCategory) : currentFilterCategory;
+    
+    let selectedCatName = categorySelect ? categorySelect.value : "";
+    if (!selectedCatName && currentFilterCategory !== 'all') {
+        const catObj = CATEGORIES.find(c => c.id == currentFilterCategory);
+        if (catObj) selectedCatName = catObj.name;
+    }
 
     const filtered = EVENTS.filter(e => {
         const matchText = e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query);
-        const matchCategory = selectedCat === 'all' || selectedCat === "" || e.category === selectedCat;
-        const matchDate = !dateQuery || e.date === dateQuery;
+        const matchCategory = !selectedCatName || selectedCatName === 'Tous' || e.category === selectedCatName;
+        const matchDate = !dateQuery || (e.date && e.date.includes(dateQuery));
         return matchText && matchCategory && matchDate;
     });
 
     renderEvents(filtered);
 }
 
-// Exposer immédiatement après définition
-window.applyAllFilters = applyAllFilters;
-
 function setupSearchListeners() {
-    const searchForm = document.getElementById('search-form');
     const searchInput = document.getElementById('search-input');
     const categorySelect = document.getElementById('category-select');
     const dateInput = document.getElementById('date-input');
 
-    if (searchForm) {
-        searchForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            applyAllFilters();
-        });
-    }
-
-    if (searchInput) searchInput.addEventListener('input', applyAllFilters);
+    if (searchInput) searchInput.addEventListener('input', () => applyAllFilters(true));
     if (categorySelect) categorySelect.addEventListener('change', (e) => {
-        currentFilterCategory = e.target.value || 'all';
+        const catObj = CATEGORIES.find(c => c.name === e.target.value);
+        currentFilterCategory = catObj ? catObj.id : 'all';
         renderCategories();
-        applyAllFilters();
+        applyAllFilters(true);
     });
-    if (dateInput) dateInput.addEventListener('change', applyAllFilters);
+    if (dateInput) dateInput.addEventListener('change', () => applyAllFilters(true));
 }
 
-function filterByCategory(id) {
+function filterByCategory(id, name) {
     currentFilterCategory = id;
     const categorySelect = document.getElementById('category-select');
-    if (categorySelect) categorySelect.value = id === 'all' ? "" : id;
-    
+    if (categorySelect) {
+        categorySelect.value = (id === 'all') ? "" : name;
+    }
     renderCategories();
-    applyAllFilters();
+    applyAllFilters(true);
 }
 
 // ==========================================
-// 7. RENDU DE L'INTERFACE
+// 7. RENDU DE L'INTERFACE (EVENTS & PAGINATION)
 // ==========================================
 function initAuthUI() {
     const user = getCurrentUser();
@@ -384,19 +266,10 @@ function initAuthUI() {
                     <i class="fas fa-user-circle me-2"></i>${escapeHtml(user.name)}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end border-0 shadow mt-2">
-                    <li>
-                        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
-                            <i class="fas fa-tachometer-alt me-2"></i>Tableau de bord
-                        </button>
-                    </li>
+                    <li><button class="dropdown-item" onclick="window.location.href='dashboard.html'"><i class="fas fa-tachometer-alt me-2"></i>Tableau de bord</button></li>
                     <li><button class="dropdown-item text-danger" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</button></li>
                 </ul>
             </div>`;
-    } else if (!user && authContainer) {
-        authContainer.innerHTML = `
-            <button class="btn btn-outline-light rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#loginModal">Connexion</button>
-            <button class="btn btn-premium" data-bs-toggle="modal" data-bs-target="#registerModal">Inscription</button>
-        `;
     }
 }
 
@@ -404,7 +277,7 @@ function renderCategories() {
     const container = document.getElementById('categories-container');
     if (!container) return;
     container.innerHTML = CATEGORIES.map(c => `
-        <div class="category-card ${c.id === currentFilterCategory ? 'active' : ''}" onclick="filterByCategory('${c.id}')" role="button">
+        <div class="category-card ${c.id == currentFilterCategory ? 'active' : ''}" onclick="filterByCategory('${c.id}', '${c.name}')" role="button">
             <i class="fas ${c.icon} mb-2"></i>
             <span class="small fw-bold">${escapeHtml(c.name)}</span>
         </div>
@@ -414,12 +287,21 @@ function renderCategories() {
 function renderEvents(list) {
     const container = document.getElementById('events-container');
     if (!container) return;
-    if (list.length === 0) {
+
+    const totalItems = list.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedItems = list.slice(startIndex, endIndex);
+
+    if (paginatedItems.length === 0) {
         container.innerHTML = '<div class="col-12 text-center py-5 text-muted">Aucun événement trouvé.</div>';
+        renderPaginationUI(0);
         return;
     }
-    container.innerHTML = list.map(e => `
-        <div class="col-md-6 col-lg-4 mb-4" data-aos="fade-up">
+
+    container.innerHTML = paginatedItems.map(e => `
+        <div class="col-md-6 col-lg-4 mb-4">
             <div class="event-card shadow-sm h-100 bg-white">
                 <div class="card-img-wrapper">
                     <img src="${e.image}" alt="${escapeHtml(e.title)}">
@@ -436,13 +318,50 @@ function renderEvents(list) {
             </div>
         </div>
     `).join('');
+
+    renderPaginationUI(totalPages);
 }
 
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+function renderPaginationUI(totalPages) {
+    let paginationContainer = document.getElementById('pagination-container');
+    if (!paginationContainer) {
+        const eventsRow = document.getElementById('events-container');
+        if (eventsRow) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'pagination-container';
+            paginationContainer.className = 'col-12 d-flex justify-content-center mt-4 mb-5';
+            eventsRow.parentNode.insertBefore(paginationContainer, eventsRow.nextSibling);
+        } else return;
+    }
+
+    if (totalPages <= 1) {
+        paginationContainer.innerHTML = '';
+        return;
+    }
+
+    let html = `<nav><ul class="pagination pagination-rounded">`;
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link shadow-sm" href="javascript:void(0)" onclick="changePage(${currentPage - 1})"><i class="fas fa-chevron-left"></i></a>
+             </li>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link shadow-sm" href="javascript:void(0)" onclick="changePage(${i})">${i}</a>
+                 </li>`;
+    }
+
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link shadow-sm" href="javascript:void(0)" onclick="changePage(${currentPage + 1})"><i class="fas fa-chevron-right"></i></a>
+             </li>`;
+
+    html += `</ul></nav>`;
+    paginationContainer.innerHTML = html;
+}
+
+function changePage(page) {
+    currentPage = page;
+    applyAllFilters(false);
+    window.scrollTo({ top: document.getElementById('events-container').offsetTop - 100, behavior: 'smooth' });
 }
 
 // ==========================================
@@ -462,8 +381,8 @@ function openDetails(id) {
     const bArea = document.getElementById('booking-area');
     if (bArea) {
         bArea.innerHTML = user 
-            ? `<button class="btn btn-success rounded-pill py-2 fw-bold" onclick="bookNow(${event.id})">Réserver ma place</button>`
-            : `<button class="btn btn-primary rounded-pill py-2" data-bs-toggle="modal" data-bs-target="#authChoiceModal">Se connecter pour réserver</button>`;
+            ? `<button class="btn btn-success rounded-pill py-2 fw-bold w-100" onclick="bookNow(${event.id})">Réserver ma place</button>`
+            : `<button class="btn btn-primary rounded-pill py-2 w-100" data-bs-toggle="modal" data-bs-target="#authChoiceModal">Se connecter pour réserver</button>`;
     }
 
     bootstrap.Modal.getOrCreateInstance(document.getElementById('eventDetailsModal')).show();
@@ -480,19 +399,29 @@ function openDetails(id) {
 // 9. PAIEMENT & RÉSERVATION
 // ==========================================
 function bookNow(id) {
-    const event = EVENTS.find(e => e.id === id);
+    const event = EVENTS.find(e => e.id == id);
     const user = getCurrentUser();
+
+    if (!event) return;
+
     Swal.fire({
         title: 'Confirmation',
         text: `Voulez-vous réserver pour "${event.title}" ?`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Oui, continuer'
+        confirmButtonText: 'Oui, continuer',
+        cancelButtonText: 'Annuler'
     }).then((res) => {
         if (res.isConfirmed) {
-            bootstrap.Modal.getInstance(document.getElementById('eventDetailsModal'))?.hide();
-            if (event.price > 0) processPayment(event, user);
-            else generateTicket(event, user);
+            const modalEl = document.getElementById('eventDetailsModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+
+            if (event.price > 0) {
+                processPayment(event, user);
+            } else {
+                generateTicket(event, user);
+            }
         }
     });
 }
@@ -501,61 +430,35 @@ function processPayment(event, user) {
     Swal.fire({
         title: 'Paiement Sécurisé',
         html: `
-            <div class="text-start p-2">
-                <div class="alert alert-info py-2 small">Total à payer: <b>${event.price} DH</b></div>
-                <div class="mb-2">
-                    <label class="form-label small mb-1">Nom sur la carte</label>
-                    <input type="text" id="card-name" class="form-control form-control-sm" placeholder="M. Mohamed">
+            <div class="text-start p-3">
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <p class="mb-0 fw-bold text-dark">${event.title}</p>
+                    <p class="mb-0 text-primary fw-bold fs-5">${event.price} DH</p>
                 </div>
-                <div class="mb-2">
-                    <label class="form-label small mb-1">Numéro de carte</label>
-                    <input type="text" id="card-num" class="form-control form-control-sm" placeholder="xxxx xxxx xxxx xxxx">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Numéro de carte</label>
+                    <input type="text" id="card-number" class="form-control" placeholder="1234 5678 9101 1121">
                 </div>
                 <div class="row">
-                    <div class="col-6">
-                        <label class="form-label small mb-1">Expiration</label>
-                        <input type="text" id="card-exp" class="form-control form-control-sm" placeholder="MM/YY">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small mb-1">CVC</label>
-                        <input type="password" id="card-cvc" class="form-control form-control-sm" placeholder="123">
-                    </div>
-                </div>
-                <div class="mt-3 text-center opacity-50">
-                    <i class="fab fa-cc-visa fa-2x mx-1"></i>
-                    <i class="fab fa-cc-mastercard fa-2x mx-1"></i>
+                    <div class="col-6 mb-3"><input type="text" id="card-expiry" class="form-control" placeholder="MM/YY"></div>
+                    <div class="col-6 mb-3"><input type="password" id="card-cvc" class="form-control" placeholder="CVC"></div>
                 </div>
             </div>
         `,
         showCancelButton: true,
         confirmButtonText: 'Payer maintenant',
-        cancelButtonText: 'Annuler',
-        focusConfirm: false,
         preConfirm: () => {
-            const name = document.getElementById('card-name').value;
-            const num = document.getElementById('card-num').value;
-            const exp = document.getElementById('card-exp').value;
-            const cvc = document.getElementById('card-cvc').value;
-            if (!name || num.length < 5 || !exp || cvc.length < 3) {
-                Swal.showValidationMessage('Informations de carte invalides');
+            const num = document.getElementById('card-number').value;
+            if (!num) {
+                Swal.showValidationMessage('Veuillez entrer les informations de carte');
                 return false;
             }
-            return true;
+            return new Promise(resolve => setTimeout(resolve, 1000));
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            Swal.fire({
-                title: 'Traitement...',
-                html: 'Validation auprès de votre banque',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                    setTimeout(() => {
-                        Swal.fire('Succès', 'Paiement effectué avec succès !', 'success')
-                            .then(() => generateTicket(event, user));
-                    }, 2000);
-                }
-            });
+            Swal.fire({ title: 'Succès', text: 'Paiement effectué !', icon: 'success', timer: 1500, showConfirmButton: false })
+            .then(() => generateTicket(event, user));
         }
     });
 }
@@ -579,13 +482,15 @@ function generateTicket(event, user) {
 
     document.getElementById('download-ticket-btn').onclick = function() {
         const element = document.getElementById('ticket-print-area');
-        const opt = { margin: 10, filename: 'Ticket-EventHub.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
-        html2pdf().set(opt).from(element).save();
+        html2pdf().from(element).save();
     };
 }
 
 function formatDate(d) {
-    return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    if (!d) return "Date à confirmer";
+    const dateObj = new Date(d);
+    if (isNaN(dateObj.getTime())) return d;
+    return dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 // ==========================================
@@ -596,50 +501,56 @@ function initChatBot() {
     const chatInput = document.getElementById('chat-input');
     const chatMessages = document.getElementById('chat-messages');
 
-    if (chatForm) {
+    if (chatForm && chatInput && chatMessages) {
         chatForm.onsubmit = (e) => {
             e.preventDefault();
-            const val = chatInput.value.trim();
-            if (!val) return;
-
-            chatMessages.innerHTML += `<div class="bg-primary text-white p-2 rounded shadow-sm" style="align-self: flex-end; max-width: 80%;">${escapeHtml(val)}</div>`;
-            chatInput.value = "";
-
+            const message = chatInput.value.trim();
+            if (!message) return;
+            appendChatMessage('user', message);
+            chatInput.value = '';
             setTimeout(() => {
-                let reply = "Je ne suis pas sûr de comprendre. Pouvez-vous reformuler ?";
-                const lower = val.toLowerCase();
-                if (lower.includes("prix") || lower.includes("tarif") || lower.includes("coût")) {
-                    reply = "Les prix varient entre 120 DH et 350 DH. Certains événements sont gratuits !";
-                } else if (lower.includes("lieu") || lower.includes("adresse") || lower.includes("où")) {
-                    reply = "Nos événements se déroulent partout à Fès : Bab Makina, Dar Batha, Place Seffarine, etc.";
-                } else if (lower.includes("date") || lower.includes("quand") || lower.includes("programme")) {
-                    reply = "Consultez notre calendrier d'événements. Les dates sont affichées sur chaque carte.";
-                } else if (lower.includes("réservation") || lower.includes("réserver") || lower.includes("ticket")) {
-                    reply = "Pour réserver, cliquez sur le bouton 'Réserver' sur l'événement qui vous intéresse.";
-                } else if (lower.includes("bonjour") || lower.includes("salut") || lower.includes("coucou")) {
-                    reply = "Bonjour ! Comment puis-je vous aider ? 🎉";
-                }
-                
-                chatMessages.innerHTML += `<div class="bg-white p-2 rounded shadow-sm" style="align-self: flex-start; max-width: 80%;">${reply}</div>`;
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }, 800);
+                const response = getBotResponse(message);
+                appendChatMessage('bot', response);
+            }, 600);
         };
+    }
+
+    function appendChatMessage(sender, text) {
+        const div = document.createElement('div');
+        div.className = `mb-2 ${sender === 'user' ? 'text-end' : 'text-start'}`;
+        const bgColor = sender === 'user' ? 'bg-primary text-white' : 'bg-light text-dark shadow-sm';
+        div.innerHTML = `<div class="d-inline-block p-2 px-3 ${bgColor}" style="border-radius:10px; max-width:85%; font-size:0.9rem;">${escapeHtml(text)}</div>`;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function getBotResponse(input) {
+        const msg = input.toLowerCase();
+        if (msg.includes('bonjour')) return "Bonjour ! Comment puis-je vous aider ?";
+        if (msg.includes('événement')) return `Nous avons ${EVENTS.length} événements.`;
+        return "Je ne comprends pas, contactez-nous au +212 5XX-XXXXXX.";
     }
 }
 
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // ==========================================
-// 12. EXPOSER LES FONCTIONS GLOBALEMENT
+// 12. EXPOSER LES FONCTIONS AU WINDOW
 // ==========================================
 window.filterByCategory = filterByCategory;
 window.openDetails = openDetails;
 window.bookNow = bookNow;
 window.logout = logout;
-window.getCurrentUser = getCurrentUser;
-window.isLoggedIn = isLoggedIn;
+window.changePage = changePage;
 window.applyAllFilters = applyAllFilters;
 
 // ==========================================
-// 13. SCRIPT INJECTÉ DE CORRECTION (FETCH DYNAMIQUE)
+// 13. FETCH DYNAMIQUE DES ÉVÉNEMENTS (FIX DATE)
 // ==========================================
 async function fetchAndAppendAPIEvents() {
     try {
@@ -649,35 +560,29 @@ async function fetchAndAppendAPIEvents() {
         if (response.ok) {
             const resData = await response.json();
             const realEvents = resData.data || resData;
-            
-            if (Array.isArray(realEvents) && realEvents.length > 0) {
+            EVENTS.length = 0;
+            if (Array.isArray(realEvents)) {
                 realEvents.forEach(apiEv => {
-                    // تفادي التكرار إذا كان الحدث موجوداً مسبقاً بالمصفوفة الثابتة
-                    if (!EVENTS.some(e => e.id === apiEv.id)) {
-                        EVENTS.push({
-                            id: apiEv.id,
-                            title: apiEv.title,
-                            category: apiEv.category,
-                            date: apiEv.date,
-                            price: parseFloat(apiEv.price) || 0,
-                            description: apiEv.description,
-                            image: apiEv.image || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000",
-                            location: typeof apiEv.location === 'string' ? JSON.parse(apiEv.location) : (apiEv.location || { name: "Fès", lat: 34.0342, lng: -5.0012 })
-                        });
+                    let imgPath = apiEv.image;
+                    if (imgPath && !imgPath.startsWith('http')) {
+                        imgPath = `http://127.0.0.1:8000/storage/${imgPath}`;
                     }
+                    EVENTS.push({
+                        id: apiEv.id,
+                        title: apiEv.title,
+                        category: (apiEv.category && typeof apiEv.category === 'object') ? apiEv.category.name : (apiEv.category || 'Général'),
+                        // --- FIX ICI : Priorité au champ start_date envoyé par le Dashboard ---
+                        date: apiEv.start_date || apiEv.event_date || apiEv.date || apiEv.created_at,
+                        price: parseFloat(apiEv.price) || 0,
+                        description: apiEv.description,
+                        image: imgPath || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000",
+                        location: typeof apiEv.location === 'string' ? JSON.parse(apiEv.location) : (apiEv.location || { name: "Fès", lat: 34.0342, lng: -5.0012 })
+                    });
                 });
-                // تحديث الواجهة فوراً بالأحداث الجديدة
-                if (typeof renderEvents === 'function') {
-                    renderEvents(EVENTS);
-                }
+                renderEvents(EVENTS);
             }
         }
     } catch (err) {
         console.error('Erreur lors du chargement des événements réels:', err);
     }
 }
-
-// التنفيذ المباشر فور التحميل بدون التأثير على الـ DOMContentLoaded الأصلي
-document.addEventListener("DOMContentLoaded", () => {
-    fetchAndAppendAPIEvents();
-});
