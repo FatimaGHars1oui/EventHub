@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Event;
 use App\Mail\BookingConfirmation;
+use App\Notifications\BookingConfirmedNotification; // إضافة المكتبة الخاصة بالإشعارات
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -87,6 +88,10 @@ class BookingController extends Controller
 
                 // تحديث عداد الحاضرين في الحدث
                 $event->increment('current_attendees', $request->quantity);
+
+                // ===== إطلاق إشعار الجرس للواجهة =====
+                $request->user()->notify(new BookingConfirmedNotification($event));
+                // ===========================================
 
                 // توليد الـ QR Code (SVG) لإرجاعه فوراً في الرد
                 $qrCode = (string) QrCode::size(200)->color(99, 102, 241)->generate($booking->booking_number);

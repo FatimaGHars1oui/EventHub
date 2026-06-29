@@ -28,6 +28,19 @@ class AdminController extends Controller
                 'total_revenue'  => round(Booking::where('payment_status', 'paid')->sum('total_amount'), 2),
             ];
 
+
+
+            // التحسين: استخدام withCount لجلب العدد مباشرة من قاعدة البيانات دون تحميل الموديلات
+        $eventsByCategory = Category::withCount('activeEvents')
+            ->get()
+            ->map(function ($category) {
+                return [
+                    'label' => $category->name,
+                    'value' => $category->active_events_count,
+                ];
+            });
+
+            
             // 2. توزيع الأحداث حسب الفئة (للرسم البياني الدائري Pie Chart)
             $eventsByCategory = Category::withCount('events')
                 ->get()

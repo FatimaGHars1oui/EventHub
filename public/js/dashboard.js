@@ -134,16 +134,30 @@ async function loadOverviewStats() {
     }
 }
 
-function initBookingsChart() {
+async function initBookingsChart() {
     const ctx1 = document.getElementById('bookings-chart')?.getContext('2d');
     if (!ctx1 || typeof Chart === 'undefined') return;
 
     if (bookingsChart) bookingsChart.destroy();
+    
+    // جلب بيانات الحجوزات الحقيقية لآخر 7 أيام
+    const res = await fetchWithAuth('/stats/overview-chart');
+    let chartLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    let chartData = [0, 0, 0, 0, 0, 0, 0];
+
+    if (res && res.ok) {
+        const result = await res.json();
+        if (result.data && result.data.labels) {
+            chartLabels = result.data.labels;
+            chartData = result.data.values;
+        }
+    }
+
     bookingsChart = new Chart(ctx1, {
         type: 'line',
         data: {
-            labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
-            datasets: [{ label: 'Réservations', data: [5, 12, 8, 15, 20, 25, 18], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.4, fill: true }]
+            labels: chartLabels,
+            datasets: [{ label: 'Réservations', data: chartData, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.4, fill: true }]
         },
         options: { responsive: true, plugins: { legend: { display: false } } }
     });
@@ -435,6 +449,24 @@ async function loadAdminStats() {
     }
 }
 
+
+
+// أضف هذا في دالة loadAdminStats بعد رسم البيانات الأخرى
+const topEvents = d.top_events || [];
+const topEventsTable = document.getElementById('top-events-table');
+if (topEventsTable && topEvents.length > 0) {
+    topEventsTable.innerHTML = topEvents.map((ev, index) => `
+        <tr>
+            <td class="fw-bold">${index + 1}</td>
+            <td>${ev.title}</td>
+            <td><span class="badge bg-primary">${ev.total_bookings || 0}</span></td>
+            <td class="fw-bold text-success">${ev.total_revenue || 0} DH</td>
+        </tr>
+    `).join('');
+} else if (topEventsTable) {
+    topEventsTable.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>';
+}
+
 // ==========================================
 // 8. Gestion des Utilisateurs (Admin uniquement)
 // ==========================================
@@ -672,4 +704,235 @@ function logout() {
             }
         });
     };
+
+
+    // ==========================================
+// 11. تزامن الوضع الليلي مع الصفحة الرئيسية
+// ==========================================
+function initDashboardDarkMode() {
+    const isDark = localStorage.getItem('darkMode') === 'true';
+    if (isDark) {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+    }
+    // تحديث أيقونة الزر
+    const btn = document.querySelector('.fa-moon, .fa-sun');
+    if(btn) {
+        btn.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+    }
+}
+
+function toggleDarkMode() {
+    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    document.documentElement.setAttribute('data-bs-theme', isDark ? 'light' : 'dark');
+    localStorage.setItem('darkMode', !isDark);
+    
+    const btn = document.querySelector('.fa-moon, .fa-sun');
+    if(btn) {
+        btn.className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+    }
+}
+
+// تشغيل الوضع الليلي فور فتح الداشبورد
+document.addEventListener('DOMContentLoaded', initDashboardDarkMode);
 })();
+
+// ==========================================
+// تصدير الجداول إلى Excel (Export Feature)
+// ==========================================
+function exportTableToCSV(tableId, filename = 'export.csv') {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        const cols = row.querySelectorAll('td, th');
+        const rowData = [];
+        cols.forEach(col => rowData.push(`"${col.innerText.trim()}"`));
+        csv.push(rowData.join(","));
+    });
+    
+    const blob = new Blob(["\uFEFF" + csv.join("\n")], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+}
+
+function exportTableToExcel(tableId, filename = 'export.xlsx') {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    const wb = XLSX.utils.table_to_booklet(table, { sheet: "Data" });
+    XLSX.writeFile(wb, filename);
+}
+
+function openProfileSettings() {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    Swal.fire({
+        title: 'Modifier mon profil',
+        html: `
+            <input type="text" id="swal-name" class="swal2-input" placeholder="Nom complet" value="${user.name || ''}">
+            <input type="email" id="swal-email" class="swal2-input" placeholder="Email" value="${user.email || ''}">
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Enregistrer',
+        cancelButtonText: 'Annuler',
+        preConfirm: () => {
+            const name = document.getElementById('swal-name').value;
+            const email = document.getElementById('swal-email').value;
+            if (!name || !email) {
+                Swal.showValidationMessage('Veuillez remplir tous les champs');
+                return false;
+            }
+            return { name, email };
+        }
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            const res = await fetchWithAuth('/auth/update-profile', {
+                method: 'POST',
+                body: JSON.stringify(result.value)
+            });
+            
+            if (res && res.ok) {
+                const data = await res.json();
+                // تحديث البيانات محلياً فوراً بدون إعادة تحميل الصفحة
+                const updatedUser = JSON.parse(localStorage.getItem('user'));
+                updatedUser.name = result.value.name;
+                updatedUser.email = result.value.email;
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                
+                document.getElementById('welcome-msg').innerText = `Bonjour, ${result.value.name} 👋`;
+                document.getElementById('user-email').innerText = result.value.email;
+                
+                Swal.fire('Succès', 'Profil mis à jour !', 'success');
+            }
+        }
+    });
+}
+
+// ==========================================
+// 12. مكتبة SheetJS للتصدير إلى Excel الحقيقي
+// ==========================================
+(function loadSheetJS() {
+    if (typeof XLSX !== 'undefined') return; // تجنب التحميل المتكرر
+    const s = document.createElement('script');
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    document.head.appendChild(s);
+})();
+
+// ==========================================
+// 13. دالة التصدير إلى Excel (نسخة مصححة ومحسّنة)
+// ==========================================
+function exportToExcel(tableId, filename) {
+    const table = document.getElementById(tableId);
+    if (!table) {
+        Swal.fire('Erreur', 'Tableau introuvable', 'error');
+        return;
+    }
+
+    if (typeof XLSX === 'undefined') {
+        Swal.fire('Chargement', 'Veuillez réessayer dans quelques secondes...', 'info');
+        return;
+    }
+
+    // إزالة أعمدة الإجراءات (الأزرار) من التصدير
+    const cleanTable = table.cloneNode(true);
+    cleanTable.querySelectorAll('td:last-child, th:last-child').forEach(el => el.remove());
+
+    const wb = XLSX.utils.table_to_book(cleanTable, { sheet: "Données" });
+
+    // تعيين عرض الأعمدة تلقائياً
+    const ws = wb.Sheets["Données"];
+    const colWidths = [];
+    if (ws['!ref']) {
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let c = range.s.c; c <= range.e.c; c++) {
+            let maxLen = 10;
+            for (let r = range.s.r; r <= range.e.r; r++) {
+                const cell = ws[XLSX.utils.encode_cell({ r, c })];
+                if (cell && cell.v) {
+                    const len = String(cell.v).length;
+                    if (len > maxLen) maxLen = len;
+                }
+            }
+            colWidths.push({ wch: maxLen + 3 });
+        }
+        ws['!cols'] = colWidths;
+    }
+
+    XLSX.writeFile(wb, filename);
+}
+
+// ==========================================
+// 14. حقن أزرار التصدير في كل جدول تلقائياً
+// ==========================================
+(function injectExportButtons() {
+    const exportConfigs = [
+        { tableId: 'bookings-table', section: 'bookings', label: 'Réservations', filename: 'mes_reservations.xlsx' },
+        { tableId: 'events-table', section: 'my-events', label: 'Événements', filename: 'mes_evenements.xlsx' },
+        { tableId: 'admin-recent-bookings', section: 'admin-stats', label: 'Réservations récentes', filename: 'reservations_recentes.xlsx' },
+        { tableId: 'top-events-table', section: 'admin-stats', label: 'Top événements', filename: 'top_evenements.xlsx' },
+        { tableId: 'users-table', section: 'admin-users', label: 'Utilisateurs', filename: 'utilisateurs.xlsx' }
+    ];
+
+    const observer = new MutationObserver(() => {
+        exportConfigs.forEach(cfg => {
+            const section = document.getElementById(cfg.section);
+            if (!section || !section.classList.contains('active')) return;
+
+            const table = document.getElementById(cfg.tableId);
+            if (!table || table.dataset.exportInjected) return;
+
+            // إنشاء زر التصدير
+            const btnWrapper = document.createElement('div');
+            btnWrapper.className = 'd-flex justify-content-end mb-3';
+            btnWrapper.innerHTML = `
+                <button 
+                    class="btn btn-success btn-sm" 
+                    onclick="exportToExcel('${cfg.tableId}', '${cfg.filename}')"
+                    title="Exporter vers Excel"
+                >
+                    <i class="fas fa-file-excel me-1"></i> Exporter ${cfg.label} (.xlsx)
+                </button>
+            `;
+
+            table.parentNode.insertBefore(btnWrapper, table);
+            table.dataset.exportInjected = 'true';
+        });
+    });
+
+    // مراقبة كل تغيير في الداشبورد
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+})();
+
+// ==========================================
+// 15. اختصار لوحة المفاتيح: Ctrl+E للتصدير السريع
+// ==========================================
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+
+        // البحث عن الجدول النشط حالياً
+        const activeSection = document.querySelector('.dashboard-section.active');
+        if (!activeSection) return;
+
+        const table = activeSection.querySelector('table');
+        if (!table || !table.id) {
+            Swal.fire('Info', 'Aucun tableau à exporter dans cette section', 'info');
+            return;
+        }
+
+        const names = {
+            'bookings-table': 'mes_reservations.xlsx',
+            'events-table': 'mes_evenements.xlsx',
+            'admin-recent-bookings': 'reservations_recentes.xlsx',
+            'top-events-table': 'top_evenements.xlsx',
+            'users-table': 'utilisateurs.xlsx'
+        };
+
+        exportToExcel(table.id, names[table.id] || 'export.xlsx');
+    }
+});

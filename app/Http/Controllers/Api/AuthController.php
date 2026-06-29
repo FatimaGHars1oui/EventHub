@@ -75,7 +75,9 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user = User::where('email', $request->email)->firstOrFail();
+        // جلب المستخدم بعد نجاح Auth::attempt
+        /** @var User $user */
+        $user = Auth::user();
         
         // مسح التوكنات القديمة (اختياري لزيادة الأمان)
         $user->tokens()->delete();
