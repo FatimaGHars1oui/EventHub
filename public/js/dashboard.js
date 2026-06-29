@@ -164,7 +164,8 @@ async function loadBookings() {
     }
 
     const result = await res.json();
-    const data = result.data || [];
+    // تعديل هنا: التأكد من الوصول للمصفوفة سواء كانت مباشرة أو داخل Paginator
+    const data = (result.data && Array.isArray(result.data.data)) ? result.data.data : (result.data || []);
 
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aucune réservation trouvée.</td></tr>';

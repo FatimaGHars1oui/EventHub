@@ -2,7 +2,7 @@
  * EventHub Fès - Core Application Script (app.js)
  * Year: 2026
  * Description: Gestion des événements, réservations, paiements sécurisés et génération de tickets.
- * FIX: Correction de l'affichage de la date (Priorité à start_date) + Pagination Intégrée.
+ * FIX: Enregistrement des réservations en DB + Gestion Admin des Users + Badge GRATUIT.
  */
 
 // ==========================================
@@ -94,8 +94,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupAuthForms();
     initChatBot();
     
-    if (window.location.pathname.includes('dashboard.html') && !isLoggedIn()) {
-        window.location.href = 'index.html';
+    // Si on est sur le dashboard admin, charger les utilisateurs
+    if (window.location.pathname.includes('dashboard.html')) {
+        if (!isLoggedIn()) window.location.href = 'index.html';
+        if (user && (user.role === 'admin' || user.is_admin)) {
+            fetchAndRenderUsers();
+        }
     }
 });
 
@@ -303,15 +307,16 @@ function renderEvents(list) {
     container.innerHTML = paginatedItems.map(e => `
         <div class="col-md-6 col-lg-4 mb-4">
             <div class="event-card shadow-sm h-100 bg-white">
-                <div class="card-img-wrapper">
+                <div class="card-img-wrapper position-relative">
                     <img src="${e.image}" alt="${escapeHtml(e.title)}">
                     <span class="badge bg-primary position-absolute m-3 top-0 start-0">${escapeHtml(e.category)}</span>
+                    ${e.price === 0 ? '<span class="badge bg-success position-absolute m-3 top-0 end-0" style="font-size:0.7rem;">GRATUIT</span>' : ''}
                 </div>
                 <div class="p-4">
                     <h5 class="fw-bold text-dark">${escapeHtml(e.title)}</h5>
                     <p class="text-muted small mb-3"><i class="fas fa-calendar-alt me-2"></i>${formatDate(e.date)}</p>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold text-primary fs-5">${e.price === 0 ? 'Gratuit' : e.price + ' DH'}</span>
+                        <span class="fw-bold text-primary fs-5">${e.price === 0 ? 'GRATUIT' : e.price + ' DH'}</span>
                         <button class="btn btn-outline-primary rounded-pill px-3" onclick="openDetails(${e.id})">Détails</button>
                     </div>
                 </div>
@@ -396,8 +401,32 @@ function openDetails(id) {
 }
 
 // ==========================================
-// 9. PAIEMENT & RÉSERVATION
+// 9. PAIEMENT & RÉSERVATION (FIXED)
 // ==========================================
+async function saveReservationToDB(event, user) {
+    const token = getToken();
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/bookings', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+    event_id: event.id,
+    quantity: 1,
+    attendee_name: user.name,
+    attendee_email: user.email
+})
+        });
+        return await response.json();
+    } catch (err) {
+        console.error("Erreur API Booking:", err);
+        return { success: false };
+    }
+}
+
 function bookNow(id) {
     const event = EVENTS.find(e => e.id == id);
     const user = getCurrentUser();
@@ -411,7 +440,7 @@ function bookNow(id) {
         showCancelButton: true,
         confirmButtonText: 'Oui, continuer',
         cancelButtonText: 'Annuler'
-    }).then((res) => {
+    }).then(async (res) => {
         if (res.isConfirmed) {
             const modalEl = document.getElementById('eventDetailsModal');
             const modalInstance = bootstrap.Modal.getInstance(modalEl);
@@ -420,6 +449,8 @@ function bookNow(id) {
             if (event.price > 0) {
                 processPayment(event, user);
             } else {
+                // Sauvegarde en base de données pour les gratuits aussi
+                await saveReservationToDB(event, user);
                 generateTicket(event, user);
             }
         }
@@ -455,8 +486,10 @@ function processPayment(event, user) {
             }
             return new Promise(resolve => setTimeout(resolve, 1000));
         }
-    }).then((result) => {
+    }).then(async (result) => {
         if (result.isConfirmed) {
+            // Sauvegarde en DB après paiement
+            await saveReservationToDB(event, user);
             Swal.fire({ title: 'Succès', text: 'Paiement effectué !', icon: 'success', timer: 1500, showConfirmButton: false })
             .then(() => generateTicket(event, user));
         }
@@ -467,7 +500,10 @@ function processPayment(event, user) {
 // 10. GÉNÉRATION DE TICKET
 // ==========================================
 function generateTicket(event, user) {
-    document.getElementById('ticket-event-title').innerText = event.title;
+    const titleEl = document.getElementById('ticket-event-title');
+    if (!titleEl) return; // Sécurité si on n'est pas sur la bonne page
+
+    titleEl.innerText = event.title;
     document.getElementById('ticket-user-name').innerText = user?.name || 'Utilisateur';
     document.getElementById('ticket-user-email').innerText = user?.email || '';
     document.getElementById('ticket-event-date').innerText = formatDate(event.date);
@@ -494,7 +530,62 @@ function formatDate(d) {
 }
 
 // ==========================================
-// 11. CHATBOT
+// 11. GESTION DES UTILISATEURS (ADMIN)
+// ==========================================
+async function fetchAndRenderUsers() {
+    const container = document.getElementById('admin-users-table');
+    if (!container) return;
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/users', {
+            headers: { 'Authorization': `Bearer ${getToken()}`, 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            const users = data.data || data;
+            container.innerHTML = users.map(u => `
+                <tr>
+                    <td>${u.id}</td>
+                    <td>${escapeHtml(u.name)}</td>
+                    <td>${escapeHtml(u.email)}</td>
+                    <td><span class="badge bg-secondary">${u.role || 'user'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) { console.error("Erreur chargement users:", e); }
+}
+
+async function deleteUser(id) {
+    const confirm = await Swal.fire({
+        title: 'Supprimer ?',
+        text: "Cette action est irréversible !",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Oui, supprimer'
+    });
+
+    if (confirm.isConfirmed) {
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/api/users/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (response.ok) {
+                Swal.fire('Supprimé!', 'L\'utilisateur a été supprimé.', 'success');
+                fetchAndRenderUsers();
+            }
+        } catch (e) { Swal.fire('Erreur', 'Impossible de supprimer.', 'error'); }
+    }
+}
+
+// ==========================================
+// 12. CHATBOT & UTILITAIRES
 // ==========================================
 function initChatBot() {
     const chatForm = document.getElementById('chat-form');
@@ -539,18 +630,17 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ==========================================
-// 12. EXPOSER LES FONCTIONS AU WINDOW
-// ==========================================
+// EXPOSITION
 window.filterByCategory = filterByCategory;
 window.openDetails = openDetails;
 window.bookNow = bookNow;
 window.logout = logout;
 window.changePage = changePage;
 window.applyAllFilters = applyAllFilters;
+window.deleteUser = deleteUser;
 
 // ==========================================
-// 13. FETCH DYNAMIQUE DES ÉVÉNEMENTS (FIX DATE)
+// 13. FETCH DYNAMIQUE DES ÉVÉNEMENTS
 // ==========================================
 async function fetchAndAppendAPIEvents() {
     try {
@@ -571,7 +661,6 @@ async function fetchAndAppendAPIEvents() {
                         id: apiEv.id,
                         title: apiEv.title,
                         category: (apiEv.category && typeof apiEv.category === 'object') ? apiEv.category.name : (apiEv.category || 'Général'),
-                        // --- FIX ICI : Priorité au champ start_date envoyé par le Dashboard ---
                         date: apiEv.start_date || apiEv.event_date || apiEv.date || apiEv.created_at,
                         price: parseFloat(apiEv.price) || 0,
                         description: apiEv.description,
