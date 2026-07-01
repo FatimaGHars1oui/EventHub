@@ -196,4 +196,26 @@ class BookingController extends Controller
             return response()->json(['success' => false, 'message' => 'Erreur'], 500);
         }
     }
+
+    public function destroyMyBooking(int $id): JsonResponse
+    {
+        $booking = Booking::where('id', $id)->where('user_id', Auth::id())->first();
+
+        if (!$booking) {
+            return response()->json(['message' => 'Réservation introuvable'], 404);
+        }
+
+        // إرجاع المقعد للحدث
+        if ($booking->event) {
+            $booking->event->increment('seats', $booking->quantity);
+        }
+
+        $booking->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Réservation annulée avec succès'
+        ]);
+    }
+
 }

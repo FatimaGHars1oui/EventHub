@@ -268,7 +268,44 @@ function initAuthUI() {
     const user = getCurrentUser();
     const authContainer = document.getElementById('auth-buttons');
     if (user && authContainer) {
-        authContainer.innerHTML = `<div class="dropdown"><button class="btn btn-primary rounded-pill dropdown-toggle px-4" data-bs-toggle="dropdown"><i class="fas fa-user-circle me-2"></i>${escapeHtml(user.name)}</button><ul class="dropdown-menu dropdown-menu-end border-0 shadow mt-2"><li><button class="dropdown-item" onclick="window.location.href='dashboard.html'"><i class="fas fa-tachometer-alt me-2"></i>Tableau de bord</button></li><li><button class="dropdown-item text-danger" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</button></li></ul></div>`;
+        const isAdmin = user.role === 'admin' || user.is_admin;
+        authContainer.innerHTML = `
+            <div class="dropdown" id="notifications-wrapper" style="display: none;">
+                <button class="btn btn-outline-light border-0 position-relative rounded-circle p-2" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-bell fs-5"></i>
+                    <span id="notif-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">0</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end p-0 shadow-lg" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                    <li class="p-3 border-bottom text-center"><h6 class="mb-0 fw-bold">Notifications</h6></li>
+                    <div id="notifications-list"></div>
+                </ul>
+            </div>
+            <button class="btn btn-outline-light rounded-pill px-3" onclick="toggleDarkMode()" title="Mode Nuit">
+                <i class="fas fa-moon"></i>
+            </button>
+            <div class="dropdown">
+                <button class="btn btn-primary rounded-pill dropdown-toggle px-4" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-2"></i>${escapeHtml(user.name)}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end border-0 shadow mt-2">
+                    <li>
+                        <a class="dropdown-item" href="profil.html">
+                            <i class="fas fa-user me-2 text-primary"></i>Mon Profil
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="dashboard.html">
+                            <i class="fas fa-tachometer-alt me-2 text-warning"></i>Tableau de bord
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button class="dropdown-item text-danger" onclick="logout()">
+                            <i class="fas fa-sign-out-alt me-2"></i>Déconnexion
+                        </button>
+                    </li>
+                </ul>
+            </div>`;
     }
 }
 
@@ -521,51 +558,189 @@ function processPayment(event, user, quantity = 1) {
 }
 
 // ==========================================
-// 12. GÉNÉRATION DE TICKET (QR Fix + Partage + Quantité)
+// 12. GÉNÉRATION DE TICKET (VERSION PDF ROBUSTE)
 // ==========================================
 function generateTicket(event, user, quantity = 1) {
     const titleEl = document.getElementById('ticket-event-title'); if (!titleEl) return;
     const totalPrice = event.price * quantity;
     
+    // 1. Mise à jour du Modal (juste pour l'affichage à l'écran)
     titleEl.innerText = event.title;
     document.getElementById('ticket-user-name').innerText = user?.name || 'Utilisateur';
     document.getElementById('ticket-user-email').innerText = user?.email || '';
     document.getElementById('ticket-event-date').innerText = formatDate(event.date);
     document.getElementById('ticket-event-location').innerText = event.location.name;
     
-    // عرض السعر الإجمالي وعدد الأشخاص
     let priceText = totalPrice === 0 ? 'GRATUIT' : totalPrice + ' DH';
     if (quantity > 1) priceText += ` (${quantity} pers.)`;
     document.getElementById('ticket-price-badge').innerText = priceText;
 
     const qrBox = document.getElementById("modal-qrcode-target");
-    qrBox.innerHTML = "";
-    new QRCode(qrBox, { text: `TICKET-${event.id}-${user?.id}-${quantity}-${Date.now()}`, width: 120, height: 120 });
+    qrBox.innerHTML = ""; 
+    
+    new QRCode(qrBox, { 
+        text: `TICKET-${event.id}-${user?.id}-${quantity}-${Date.now()}`, 
+        width: 150, 
+        height: 150,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
 
     new bootstrap.Modal(document.getElementById('ticketModal')).show();
 
+    // 2. Bouton de téléchargement
     document.getElementById('download-ticket-btn').onclick = function() {
-        const element = document.getElementById('ticket-print-area');
-        const qrContainer = document.getElementById("modal-qrcode-target");
-        const canvas = qrContainer.querySelector('canvas');
-        const oldImg = qrContainer.querySelector('img');
-        
-        if (canvas) {
-            const imgSrc = canvas.toDataURL('image/png');
-            const tempImg = document.createElement('img');
-            tempImg.src = imgSrc; tempImg.style.width = '120px'; tempImg.style.height = '120px'; tempImg.style.display = 'block'; tempImg.style.margin = 'auto';
-            canvas.style.display = 'none'; if(oldImg) oldImg.style.display = 'none';
-            qrContainer.appendChild(tempImg);
-            html2pdf().from(element).save().finally(() => { canvas.style.display = 'block'; if(oldImg) oldImg.style.display = 'block'; tempImg.remove(); });
-        } else { html2pdf().from(element).save(); }
+        const btn = document.getElementById('download-ticket-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Génération en cours...';
+        btn.disabled = true;
+
+        // Petit délai pour s'assurer que le QR est bien dessiné
+        setTimeout(() => {
+            generateStandalonePDF(event, user, quantity, priceText).finally(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }, 1000);
     };
 
+    // 3. Partage WhatsApp
     const shareBtn = document.getElementById('share-ticket-btn');
     if (shareBtn) {
         shareBtn.onclick = function() {
-            const text = `Je viens de réserver ${quantity} place(s) pour "${event.title}" via EventHub Fès ! Réservez vite.`;
+            const text = `Je viens de réserver ${quantity} place(s) pour "${event.title}" via EventHub Fès !`;
             window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
         };
+    }
+}
+
+// ==========================================
+// FONCTION INDÉPENDANTE POUR LE PDF (SANS PASSER PAR LE MODAL)
+// ==========================================
+async function generateStandalonePDF(event, user, quantity, priceText) {
+    const qrContainer = document.getElementById("modal-qrcode-target");
+    const canvas = qrContainer.querySelector('canvas');
+    
+    // استخراج QR كـ Base64
+    let qrImageSrc = '';
+    if (canvas && canvas.width > 0 && canvas.height > 0) {
+        qrImageSrc = canvas.toDataURL('image/png');
+    } else {
+        const img = qrContainer.querySelector('img');
+        if (img && img.src) qrImageSrc = img.src;
+    }
+
+    if (!qrImageSrc) {
+        Swal.fire('Erreur', 'Impossible de lire le code QR. Réessayez.', 'error');
+        return;
+    }
+
+    // ✅ العنصر visible لكن محطوط ورا كلشي (مش خارج الشاشة)
+    const tempDiv = document.createElement('div');
+    tempDiv.id = 'temp-pdf-ticket';
+    tempDiv.style.cssText = `
+        width: 400px; 
+        padding: 30px; 
+        font-family: Arial, Helvetica, sans-serif; 
+        background: #ffffff; 
+        color: #333333; 
+        position: fixed; 
+        left: 0; 
+        top: 0; 
+        z-index: -9999;
+        opacity: 1;
+        visibility: visible;
+        display: block;
+    `;
+
+    tempDiv.innerHTML = `
+        <div style="text-align: center; border-bottom: 3px solid #0d6efd; padding-bottom: 15px; margin-bottom: 25px;">
+            <h1 style="margin: 0; color: #0d6efd; font-size: 26px; font-weight: bold;">EventHub Fès</h1>
+            <p style="margin: 5px 0 0 0; color: #888; font-size: 13px; letter-spacing: 2px;">TICKET OFFICIEL</p>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 25px; text-align: center;">
+            <h2 style="margin: 0; font-size: 20px; color: #000;">${escapeHtml(event.title)}</h2>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 14px;">
+            <tr>
+                <td style="padding: 10px 0; color: #666; width: 35%; border-bottom: 1px solid #eee;">Nom :</td>
+                <td style="padding: 10px 0; font-weight: bold; border-bottom: 1px solid #eee;">${escapeHtml(user?.name || 'N/A')}</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #666; border-bottom: 1px solid #eee;">Email :</td>
+                <td style="padding: 10px 0; font-weight: bold; border-bottom: 1px solid #eee;">${escapeHtml(user?.email || 'N/A')}</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #666; border-bottom: 1px solid #eee;">Date :</td>
+                <td style="padding: 10px 0; font-weight: bold; border-bottom: 1px solid #eee;">${formatDate(event.date)}</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #666; border-bottom: 1px solid #eee;">Lieu :</td>
+                <td style="padding: 10px 0; font-weight: bold; border-bottom: 1px solid #eee;">${escapeHtml(event.location.name)}</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #666;">Places :</td>
+                <td style="padding: 10px 0; font-weight: bold;">${quantity} personne(s)</td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #666;">Tarif :</td>
+                <td style="padding: 10px 0; font-weight: bold; color: #0d6efd; font-size: 18px;">${priceText}</td>
+            </tr>
+        </table>
+
+        <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ddd;">
+            <img src="${qrImageSrc}" style="width: 140px; height: 140px; display: block; margin: 0 auto;" />
+            <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">Présentez ce code QR à l'entrée de l'événement</p>
+        </div>
+    `;
+
+    document.body.appendChild(tempDiv);
+
+    const opt = {
+        margin: 0.3,
+        filename: `Ticket_${event.title.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false, 
+            backgroundColor: '#ffffff',
+            // ✅ المفتاح: onclone كيخلي العنصر visible فالنسخة اللي html2canvas كيخدم عليها
+            onclone: function(clonedDoc) {
+                const el = clonedDoc.getElementById('temp-pdf-ticket');
+                if (el) {
+                    el.style.position = 'fixed';
+                    el.style.left = '0';
+                    el.style.top = '0';
+                    el.style.zIndex = '99999';
+                    el.style.opacity = '1';
+                    el.style.visibility = 'visible';
+                    el.style.display = 'block';
+                    el.style.width = '400px';
+                }
+                // تأكد أن الصورة مازالت حاضرة
+                const imgs = el ? el.querySelectorAll('img') : [];
+                imgs.forEach(img => {
+                    if (!img.complete || !img.naturalWidth) {
+                        img.src = img.src; // force reload
+                    }
+                });
+            }
+        },
+        jsPDF: { unit: 'mm', format: [150, 230], orientation: 'portrait' }
+    };
+
+    try {
+        await html2pdf().set(opt).from(tempDiv).save();
+    } catch (error) {
+        console.error("Erreur PDF:", error);
+        Swal.fire('Erreur', 'Une erreur est survenue lors du téléchargement.', 'error');
+    } finally {
+        const el = document.getElementById('temp-pdf-ticket');
+        if (el) el.remove();
     }
 }
 
@@ -607,14 +782,851 @@ async function deleteUser(id) {
 // ==========================================
 // 15. CHATBOT
 // ==========================================
-function initChatBot() {
-    const chatForm = document.getElementById('chat-form'); const chatInput = document.getElementById('chat-input'); const chatMessages = document.getElementById('chat-messages');
-    if (chatForm && chatInput && chatMessages) {
-        chatForm.onsubmit = (e) => { e.preventDefault(); const message = chatInput.value.trim(); if (!message) return; appendChatMessage('user', message); chatInput.value = ''; setTimeout(() => appendChatMessage('bot', getBotResponse(message)), 600); };
+// ==========================================
+// CHATBOT AVANCÉ - EventHub Fès (Version FR)
+// ==========================================
+
+const ChatBot = {
+    // État de la conversation
+    state: {
+        context: null,           // Contexte actuel (search, booking, help...)
+        lastSearchResults: [],   // Derniers résultats de recherche
+        selectedEvent: null,     // Événement sélectionné
+        messageHistory: [],      // Historique de la conversation
+        userName: null,          // Nom de l'utilisateur
+        step: 0,                 // Étape dans la conversation multi-étapes
+        bookingData: {}          // Données de réservation temporaires
+    },
+
+    // ==========================================
+    // 1. BASE DE CONNAISSANCES
+    // ==========================================
+    knowledge: {
+        greetings: {
+            patterns: ['bonjour', 'salut', 'hello', 'hi', 'hey', 'coucou', 'bonsoir'],
+            responses: [
+                "Bonjour ! 👋 Je suis l'assistant EventHub Fès. Comment puis-je vous aider ?",
+                "Salut ! 💫 Qu'est-ce que je peux faire pour vous ? Vous pouvez me demander des infos sur les événements, les réservations, ou autre chose.",
+                "Bonjour et bienvenue ! 🎉 Que puis-je faire pour vous aujourd'hui ?"
+            ]
+        },
+        
+        events: {
+            patterns: ['événement', 'event', 'activité', 'programme', 'quoi', 'quoi de prévu', 'liste', 'voir'],
+            responses: () => {
+                const freeEvents = EVENTS.filter(e => e.price === 0);
+                const paidEvents = EVENTS.filter(e => e.price > 0);
+                const upcomingEvents = EVENTS.filter(e => new Date(e.date) > new Date());
+                
+                return `📊 **Résumé des événements :**\n\n` +
+                    `• Total des événements : ${EVENTS.length}\n` +
+                    `• À venir : ${upcomingEvents.length}\n` +
+                    `• Gratuits : ${freeEvents.length} 🎉\n` +
+                    `• Payants : ${paidEvents.length} 💰\n\n` +
+                    `Voulez-vous voir les détails ? Dites-moi "Événements gratuits" ou "Événements cette semaine"`;
+            }
+        },
+
+        freeEvents: {
+            patterns: ['gratuit', 'gratuite', 'gratuits', 'free', 'sans payer', '0 dh', 'pas cher', 'pas payant'],
+            responses: () => {
+                const free = EVENTS.filter(e => e.price === 0);
+                if (free.length === 0) return "⚠️ Il n'y a pas d'événements gratuits pour le moment. Mais nous avons des événements à petits prix ! Dites-moi 'Événements pas chers'";
+                
+                let response = "🎉 **Événements gratuits :**\n\n";
+                free.slice(0, 5).forEach((e, i) => {
+                    response += `${i + 1}. **${e.title}**\n   📅 ${formatDate(e.date)}\n\n`;
+                });
+                response += "Voulez-vous réserver l'un d'entre eux ? Dites-moi son numéro !";
+                ChatBot.state.context = 'free-events-list';
+                ChatBot.state.lastSearchResults = free;
+                return response;
+            }
+        },
+
+        searchByCategory: {
+            patterns: ['musique', 'music', 'concert', 'sport', 'culture', 'art', 'exposition', 'technologie', 'tech', 'digital', 'food', 'gastronomie', 'cuisine', 'informatique'],
+            responses: (match) => {
+                const normalizedMatch = match.toLowerCase();
+                const categoryMap = {
+                    'musique': ['musique', 'music', 'concert'],
+                    'sport': ['sport', 'football', 'basket', 'course'],
+                    'culture': ['culture', 'art', 'exposition', 'histoire'],
+                    'technologie': ['technologie', 'tech', 'digital', 'informatique'],
+                    'gastronomie': ['food', 'gastronomie', 'cuisine', 'repas']
+                };
+                
+                let foundCategory = null;
+                for (const [cat, keywords] of Object.entries(categoryMap)) {
+                    if (keywords.some(k => normalizedMatch.includes(k))) {
+                        foundCategory = cat;
+                        break;
+                    }
+                }
+                
+                if (!foundCategory) return "Je n'ai pas compris la catégorie. Vous pouvez dire : musique, sport, culture, technologie ou gastronomie.";
+                
+                const results = EVENTS.filter(e => 
+                    e.category.toLowerCase().includes(foundCategory) ||
+                    e.title.toLowerCase().includes(foundCategory)
+                );
+                
+                if (results.length === 0) return `⚠️ Aucun événement trouvé dans la catégorie "${foundCategory}" pour le moment.`;
+                
+                ChatBot.state.context = 'category-search';
+                ChatBot.state.lastSearchResults = results;
+                
+                let response = `📋 **Événements ${foundCategory} :**\n\n`;
+                results.slice(0, 5).forEach((e, i) => {
+                    response += `${i + 1}. **${e.title}** - ${e.price === 0 ? 'Gratuit' : e.price + ' DH'}\n   📅 ${formatDate(e.date)}\n\n`;
+                });
+                response += "Dites-moi le numéro de l'événement pour voir les détails !";
+                return response;
+            }
+        },
+
+        pricing: {
+            patterns: ['prix', 'coût', 'combien', 'tarif', 'payer', 'coûte', 'budget', 'cher'],
+            responses: [
+                "💰 Les prix varient selon l'événement :\n\n• Événements gratuits : 0 DH 🎉\n• Événements culturels : 20-50 DH\n• Concerts : 50-200 DH\n• Ateliers : 100-500 DH\n\nVoulez-vous connaître le prix d'un événement précis ? Dites-moi son nom !",
+                "Les prix commencent à 0 DH pour les événements gratuits et peuvent aller jusqu'à 500 DH pour les ateliers spécialisés. Quel est votre budget ?"
+            ]
+        },
+
+        booking: {
+            patterns: ['réserver', 'réservation', 'réserver', 'book', 'inscrire', 'acheter', 'billet', 'ticket'],
+            responses: () => {
+                const user = getCurrentUser();
+                if (!user) {
+                    return "🔒 Vous devez être connecté pour réserver !\n\n👉 [Cliquez ici pour vous connecter](javascript:showLoginModal())\n\nOu dites-moi 'Comment réserver' pour une explication.";
+                }
+                
+                if (EVENTS.length === 0) return "⚠️ Aucun événement disponible pour le moment.";
+                
+                ChatBot.state.context = 'booking-flow';
+                ChatBot.state.step = 1;
+                
+                let response = "📝 **Étapes de réservation :**\n\n";
+                response += "1️⃣ Sélection de l'événement\n";
+                response += "2️⃣ Choix du nombre de personnes\n";
+                response += "3️⃣ Paiement (si payant)\n";
+                response += "4️⃣ Réception du billet avec QR Code\n\n";
+                response += "Voulez-vous commencer ? Dites-moi quel type d'événement vous recherchez (musique, sport, culture...)";
+                return response;
+            }
+        },
+
+        howToBook: {
+            patterns: ['comment réserver', 'comment faire', 'procédure', 'démarche', 'aide réservation', 'expliquer réservation'],
+            responses: `📖 **Explication de la réservation étape par étape :**\n\n
+1️⃣ **Parcourir les événements** - Utilisez la recherche ou les filtres\n
+2️⃣ **Cliquez sur "Détails"** - Voir les informations complètes\n
+3️⃣ **Cliquez sur "Réserver"** - Choisissez le nombre de personnes\n
+4️⃣ **Payez** - Via Stripe (100% sécurisé)\n
+5️⃣ **Recevez votre billet** - Avec QR Code + PDF\n\n
+💡 *Note : Pour les événements gratuits, le billet est généré immédiatement !*`
+        },
+
+        myBookings: {
+            patterns: ['mes réservations', 'mes billets', 'mes tickets', 'historique', 'réservations passées'],
+            responses: () => {
+                const user = getCurrentUser();
+                if (!user) return "🔒 Vous devez être connecté pour voir vos réservations.";
+                
+                const bookings = JSON.parse(localStorage.getItem('my_bookings') || '[]');
+                if (bookings.length === 0) return "📭 Vous n'avez encore réservé aucun événement. Voulez-vous que je vous montre les événements disponibles ?";
+                
+                let response = "🎫 **Vos réservations :**\n\n";
+                bookings.forEach((b, i) => {
+                    const event = EVENTS.find(e => e.id === b.event_id);
+                    if (event) {
+                        response += `${i + 1}. **${event.title}**\n   📅 ${formatDate(event.date)} | 👥 ${b.quantity} personne(s)\n\n`;
+                    }
+                });
+                return response;
+            }
+        },
+
+        location: {
+            patterns: ['où', 'lieu', 'adresse', 'localisation', 'emplacement', 'accès', 'comment venir', 'situé'],
+            responses: [
+                "📍 La plupart de nos événements se déroulent à Fès :\n\n• **La Médina** (Fès El Bali)\n• **Ville Nouvelle** (Fès Jdid)\n• **Centre-ville**\n\nChaque événement dispose d'une carte détaillée dans sa page de détails ! 🗺️",
+                "Notre service est actuellement disponible uniquement à Fès 🕌\n\nVoulez-vous connaître le lieu d'un événement précis ? Dites-moi son nom !"
+            ]
+        },
+
+        contact: {
+            patterns: ['contact', 'appeler', 'téléphone', 'phone', 'email', 'whatsapp', 'aider', 'help', 'support', 'assistance'],
+            responses: `📞 **Nos coordonnées :**\n\n
+📱 WhatsApp : +212 5XX-XXXXXX\n
+📧 Email : contact@eventhub-fes.ma\n
+📍 Adresse : Fès, Maroc\n
+⏰ Horaires : 9h - 18h (Lundi - Vendredi)\n\n
+Ou écrivez-moi ici et j'essaierai de vous aider ! 😊`
+        },
+
+        cancel: {
+            patterns: ['annuler', 'retour', 'revenir', 'début', 'quitter', 'stop', 'non merci'],
+            responses: () => {
+                ChatBot.state.context = null;
+                ChatBot.state.step = 0;
+                return "👌 Retour au début. Que puis-je faire pour vous ?";
+            }
+        },
+
+        thanks: {
+            patterns: ['merci', 'merci beaucoup', 'thank', 'thanks', 'super', 'génial', 'parfait', 'excellent'],
+            responses: [
+                "De rien ! 😊 Ravi d'avoir pu vous aider. Autre chose ?",
+                "Il n'y a pas de quoi ! 💫 Je suis là à tout moment si vous avez besoin.",
+                "Avec plaisir ! 🙏 N'hésitez pas si vous avez d'autres questions."
+            ]
+        },
+
+        goodbye: {
+            patterns: ['au revoir', 'bye', 'à bientôt', 'bonne journée', 'bonne soirée', 'ciao', 'adieu'],
+            responses: [
+                "Au revoir ! 👋 Au plaisir de vous voir à nos événements ! 🎉",
+                "À bientôt ! 💫 N'oubliez pas de nous suivre sur les réseaux sociaux !",
+                "Ciao ! 🤝 Nous espérons que vous passerez un excellent moment !"
+            ]
+        }
+    },
+
+    // ==========================================
+    // 2. RÉPONSES PAR DÉFAUT INTELLIGENTES
+    // ==========================================
+    fallbackResponses: [
+        "Je n'ai pas bien compris 😅 Pourriez-vous reformuler votre question ?\n\nOu choisissez parmi ces sujets :\n• Événements\n• Réservation\n• Prix\n• Contact",
+        "Question pas très claire pour moi 🤔 Essayez de demander :\n- 'Quels sont les événements ?'\n- 'Comment réserver ?'\n- 'Y a-t-il des événements gratuits ?'",
+        "Je suis spécialisé dans les questions sur les événements 🎯 Essayez de me demander un événement précis ou comment réserver !"
+    ],
+
+    // ==========================================
+    // 3. BOUTONS RAPIDES (QUICK REPLIES)
+    // ==========================================
+    quickReplies: [
+        { text: '📋 Événements', action: 'events', icon: 'fa-calendar' },
+        { text: '🎉 Gratuits', action: 'freeEvents', icon: 'fa-gift' },
+        { text: '📝 Comment réserver ?', action: 'howToBook', icon: 'fa-question-circle' },
+        { text: '🎫 Mes réservations', action: 'myBookings', icon: 'fa-ticket-alt' },
+        { text: '📞 Contact', action: 'contact', icon: 'fa-phone' }
+    ],
+
+    // ==========================================
+    // 4. INITIALISATION
+    // ==========================================
+    init() {
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatToggle = document.getElementById('chat-toggle');
+        const chatWindow = document.getElementById('chat-window');
+
+        if (!chatForm || !chatInput || !chatMessages) return;
+
+        // Ouvrir/Fermer la fenêtre
+        if (chatToggle && chatWindow) {
+            chatToggle.onclick = () => {
+                chatWindow.classList.toggle('d-none');
+                if (!chatWindow.classList.contains('d-none')) {
+                    chatInput.focus();
+                    if (ChatBot.state.messageHistory.length === 0) {
+                        ChatBot.sendWelcomeMessage();
+                    }
+                }
+            };
+        }
+
+        // Envoi du message
+        chatForm.onsubmit = (e) => {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (!message) return;
+            
+            ChatBot.processMessage(message);
+            chatInput.value = '';
+            chatInput.focus();
+        };
+
+        // Suggestions pendant la frappe
+        chatInput.addEventListener('input', debounce((e) => {
+            ChatBot.showSuggestions(e.target.value);
+        }, 300));
+    },
+
+    // ==========================================
+    // 5. TRAITEMENT DES MESSAGES
+    // ==========================================
+    processMessage(message) {
+        ChatBot.state.messageHistory.push({ sender: 'user', text: message, time: new Date() });
+        ChatBot.appendMessage('user', message);
+        ChatBot.hideSuggestions();
+        ChatBot.showTypingIndicator();
+        
+        const delay = 500 + Math.random() * 800;
+        
+        setTimeout(() => {
+            ChatBot.hideTypingIndicator();
+            const response = ChatBot.generateResponse(message);
+            ChatBot.appendMessage('bot', response);
+            ChatBot.state.messageHistory.push({ sender: 'bot', text: response, time: new Date() });
+        }, delay);
+    },
+
+    // ==========================================
+    // 6. GÉNÉRATION DES RÉPONSES
+    // ==========================================
+    generateResponse(input) {
+        const normalizedInput = input.toLowerCase().trim();
+        
+        // Vérifier le contexte actuel
+        if (ChatBot.state.context) {
+            const contextResponse = ChatBot.handleContext(normalizedInput);
+            if (contextResponse) return contextResponse;
+        }
+
+        // Chercher dans la base de connaissances
+        for (const [intent, data] of Object.entries(ChatBot.knowledge)) {
+            const isMatch = data.patterns.some(pattern => 
+                normalizedInput.includes(pattern.toLowerCase())
+            );
+            
+            if (isMatch) {
+                if (typeof data.responses === 'function') {
+                    return data.responses(normalizedInput);
+                }
+                return data.responses[Math.floor(Math.random() * data.responses.length)];
+            }
+        }
+
+        // Recherche directe dans les événements
+        const directMatch = ChatBot.searchEventByTitle(normalizedInput);
+        if (directMatch) return directMatch;
+
+        // Vérification des numéros (sélection depuis une liste)
+        if (/^\d+$/.test(normalizedInput)) {
+            return ChatBot.handleNumberSelection(parseInt(normalizedInput));
+        }
+
+        // Réponse par défaut
+        return ChatBot.fallbackResponses[Math.floor(Math.random() * ChatBot.fallbackResponses.length)];
+    },
+
+    // ==========================================
+    // 7. GESTION DU CONTEXTE
+    // ==========================================
+    handleContext(input) {
+        switch (ChatBot.state.context) {
+            case 'free-events-list':
+            case 'category-search':
+                return ChatBot.handleNumberSelection(parseInt(input));
+                
+            case 'booking-flow':
+                return ChatBot.handleBookingFlow(input);
+                
+            default:
+                return null;
+        }
+    },
+
+    handleNumberSelection(num) {
+        const results = ChatBot.state.lastSearchResults;
+        
+        if (!results || isNaN(num) || num < 1 || num > results.length) {
+            ChatBot.state.context = null;
+            return "⚠️ Numéro invalide. Retour au début. Que voulez-vous faire ?";
+        }
+
+        const event = results[num - 1];
+        ChatBot.state.selectedEvent = event;
+        ChatBot.state.context = null;
+
+        let response = `🎯 **${event.title}**\n\n`;
+        response += `📂 Catégorie : ${event.category}\n`;
+        response += `📅 Date : ${formatDate(event.date)}\n`;
+        response += `💰 Prix : ${event.price === 0 ? 'Gratuit' : event.price + ' DH'}\n`;
+        response += `📍 Lieu : ${event.location.name}\n`;
+        
+        if (event.seats !== null && event.seats !== undefined) {
+            response += `💺 Places : ${event.seats <= 0 ? 'Complet 😔' : event.seats + ' disponibles'}\n`;
+        }
+        
+        response += `\nVoulez-vous réserver cet événement ? Dites "Oui" ou cliquez sur le bouton 👇`;
+        
+        setTimeout(() => {
+            ChatBot.appendActionButton(`✅ Réserver "${event.title}"`, `openDetails(${event.id})`);
+        }, 100);
+        
+        return response;
+    },
+
+    handleBookingFlow(input) {
+        const step = ChatBot.state.step;
+        
+        if (input.includes('annuler') || input.includes('non')) {
+            ChatBot.state.context = null;
+            ChatBot.state.step = 0;
+            return "👌 Processus de réservation annulé.";
+        }
+
+        switch (step) {
+            case 1:
+                const results = EVENTS.filter(e => 
+                    e.title.toLowerCase().includes(input) || 
+                    e.category.toLowerCase().includes(input)
+                );
+                
+                if (results.length === 0) {
+                    return "⚠️ Aucun événement trouvé avec ce nom. Essayez un autre mot ou dites 'Annuler'.";
+                }
+                
+                ChatBot.state.lastSearchResults = results;
+                ChatBot.state.step = 2;
+                
+                let response = "Choisissez l'événement :\n\n";
+                results.slice(0, 5).forEach((e, i) => {
+                    response += `${i + 1}. **${e.title}** (${e.price === 0 ? 'Gratuit' : e.price + ' DH'})\n`;
+                });
+                return response;
+
+            case 2:
+                const selectedEvent = ChatBot.state.lastSearchResults[parseInt(input) - 1];
+                if (!selectedEvent) return "Numéro invalide. Veuillez réessayer.";
+                
+                ChatBot.state.bookingData.event = selectedEvent;
+                ChatBot.state.step = 3;
+                
+                return `Vous avez sélectionné **${selectedEvent.title}** ✅\n\nCombien de personnes souhaitez-vous réserver ? (1-10)`;
+
+            case 3:
+                const qty = parseInt(input);
+                if (isNaN(qty) || qty < 1 || qty > 10) {
+                    return "⚠️ Veuillez entrer un nombre entre 1 et 10.";
+                }
+                
+                ChatBot.state.bookingData.quantity = qty;
+                const event = ChatBot.state.bookingData.event;
+                const total = event.price * qty;
+                
+                ChatBot.state.step = 4;
+                
+                let confirmMsg = `📝 **Confirmation de réservation :**\n\n`;
+                confirmMsg += `📌 Événement : ${event.title}\n`;
+                confirmMsg += `👥 Nombre de personnes : ${qty}\n`;
+                confirmMsg += `💰 Montant : ${total === 0 ? 'Gratuit' : total + ' DH'}\n\n`;
+                confirmMsg += `Confirmez-vous ? (Oui/Non)`;
+                return confirmMsg;
+
+            case 4:
+                if (input.includes('oui') || input.includes('yes') || input.includes('oui')) {
+                    ChatBot.state.context = null;
+                    ChatBot.state.step = 0;
+                    
+                    const user = getCurrentUser();
+                    const bookEvent = ChatBot.state.bookingData.event;
+                    const bookQty = ChatBot.state.bookingData.quantity;
+                    
+                    if (bookEvent.price === 0) {
+                        saveReservationToDB(bookEvent, user, bookQty);
+                        saveBookingLocally(bookEvent.id, bookQty);
+                        return `🎉 **Réservation réussie !**\n\nVotre billet est prêt ! Voulez-vous le voir ou le recevoir par WhatsApp ?`;
+                    } else {
+                        setTimeout(() => {
+                            ChatBot.appendActionButton('💳 Payer maintenant', `processPayment(EVENTS.find(e=>e.id===${bookEvent.id}), getCurrentUser(), ${bookQty})`);
+                        }, 100);
+                        return `💰 Montant : ${bookEvent.price * bookQty} DH\n\nCliquez sur le bouton pour payer en toute sécurité via Stripe.`;
+                    }
+                } else {
+                    ChatBot.state.context = null;
+                    ChatBot.state.step = 0;
+                    return "👌 Réservation annulée. Autre chose ?";
+                }
+
+            default:
+                return null;
+        }
+    },
+
+    // ==========================================
+    // 8. RECHERCHE DIRECTE DANS LES ÉVÉNEMENTS
+    // ==========================================
+    searchEventByTitle(input) {
+        // Supprimer les mots vides français
+        const stopWords = ['quoi', 'comment', 'où', 'pourquoi', 'est', 'un', 'une', 'de', 'le', 'la', 'les', 'et', 'je', 'tu', 'il', 'nous', 'vous', 'ils', 'ce', 'cet', 'cette'];
+        const cleanInput = stopWords.reduce((str, word) => str.replace(word, ''), input).trim();
+        
+        if (cleanInput.length < 2) return null;
+        
+        const matches = EVENTS.filter(e => 
+            e.title.toLowerCase().includes(cleanInput) ||
+            e.description.toLowerCase().includes(cleanInput)
+        );
+        
+        if (matches.length === 0) return null;
+        if (matches.length === 1) {
+            const e = matches[0];
+            return `🎯 J'ai trouvé cet événement :\n\n**${e.title}**\n📅 ${formatDate(e.date)}\n💰 ${e.price === 0 ? 'Gratuit' : e.price + ' DH'}\n\nVoulez-vous réserver ?`;
+        }
+        
+        ChatBot.state.context = 'category-search';
+        ChatBot.state.lastSearchResults = matches;
+        
+        let response = `🔍 J'ai trouvé ${matches.length} événements :\n\n`;
+        matches.slice(0, 5).forEach((e, i) => {
+            response += `${i + 1}. **${e.title}**\n`;
+        });
+        response += "\nDites-moi son numéro pour voir les détails !";
+        return response;
+    },
+
+    // ==========================================
+    // 9. INTERFACE UTILISATEUR AMÉLIORÉE
+    // ==========================================
+    appendMessage(sender, text) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const div = document.createElement('div');
+        div.className = `mb-3 ${sender === 'user' ? 'text-end' : 'text-start'}`;
+        
+        const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        
+        if (sender === 'user') {
+            div.innerHTML = `
+                <div class="d-inline-block bg-primary text-white p-3 px-4" 
+                     style="border-radius: 18px 18px 4px 18px; max-width: 85%; font-size: 0.9rem; line-height: 1.5;">
+                    ${escapeHtml(text)}
+                </div>
+                <div class="text-muted small mt-1">${time}</div>
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="d-flex align-items-start gap-2">
+                    <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                         style="width: 32px; height: 32px; font-size: 0.8rem;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <div class="bg-light text-dark p-3 px-4 shadow-sm" 
+                             style="border-radius: 18px 18px 18px 4px; max-width: 85%; font-size: 0.9rem; line-height: 1.6; white-space: pre-line;">
+                            ${ChatBot.formatBotMessage(text)}
+                        </div>
+                        <div class="text-muted small mt-1">${time}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    },
+
+    formatBotMessage(text) {
+        // Convertir un Markdown simple en HTML
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="text-primary text-decoration-underline" onclick="event.preventDefault(); $2">$1</a>');
+    },
+
+    appendActionButton(text, onclick) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const div = document.createElement('div');
+        div.className = 'mb-3 text-start ms-4';
+        div.innerHTML = `
+            <button class="btn btn-success btn-sm rounded-pill px-4 py-2 shadow-sm" 
+                    onclick="${onclick}; this.parentElement.remove();">
+                ${text}
+            </button>
+        `;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    },
+
+    appendQuickReplies(replies) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const container = document.createElement('div');
+        container.className = 'd-flex flex-wrap gap-2 mb-3 ms-4';
+        container.id = 'quick-replies-container';
+        
+        replies.forEach(reply => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-outline-primary btn-sm rounded-pill px-3 py-1';
+            btn.innerHTML = `<i class="fas ${reply.icon} me-1"></i>${reply.text}`;
+            btn.onclick = () => {
+                container.remove();
+                const queryMap = {
+                    'freeEvents': 'Événements gratuits',
+                    'howToBook': 'Comment réserver',
+                    'myBookings': 'Mes réservations',
+                    'contact': 'Contact',
+                    'events': 'Quels sont les événements'
+                };
+                ChatBot.processMessage(queryMap[reply.action] || reply.text);
+            };
+            container.appendChild(btn);
+        });
+        
+        chatMessages.appendChild(container);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    },
+
+    // ==========================================
+    // 10. INDICATEUR DE FRAPPE
+    // ==========================================
+    showTypingIndicator() {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        
+        const div = document.createElement('div');
+        div.id = 'typing-indicator';
+        div.className = 'mb-3 text-start';
+        div.innerHTML = `
+            <div class="d-flex align-items-start gap-2">
+                <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                     style="width: 32px; height: 32px; font-size: 0.8rem;">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="bg-light p-3 px-4 shadow-sm" style="border-radius: 18px 18px 18px 4px;">
+                    <div class="d-flex gap-1">
+                        <span class="bg-secondary rounded-circle" style="width:8px;height:8px;animation:typingBounce 1s infinite;"></span>
+                        <span class="bg-secondary rounded-circle" style="width:8px;height:8px;animation:typingBounce 1s infinite 0.2s;"></span>
+                        <span class="bg-secondary rounded-circle" style="width:8px;height:8px;animation:typingBounce 1s infinite 0.4s;"></span>
+                    </div>
+                </div>
+            </div>
+        `;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    },
+
+    hideTypingIndicator() {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) indicator.remove();
+    },
+
+    // ==========================================
+    // 11. SUGGESTIONS PENDANT LA FRAPPE
+    // ==========================================
+    showSuggestions(input) {
+        ChatBot.hideSuggestions();
+        
+        if (input.length < 2) return;
+        
+        const suggestions = [
+            { text: 'Les événements disponibles', query: 'Quels sont les événements' },
+            { text: 'Événements gratuits', query: 'Événements gratuits' },
+            { text: 'Comment réserver ?', query: 'Comment réserver' },
+            { text: 'Mes réservations', query: 'Mes réservations' },
+            { text: 'Prix des billets', query: 'Quel est le prix' },
+            { text: 'Lieu des événements', query: 'Où se déroulent les événements' },
+            { text: 'Nous contacter', query: 'Contact' }
+        ].filter(s => s.text.toLowerCase().includes(input.toLowerCase()) || s.query.toLowerCase().includes(input.toLowerCase()));
+        
+        if (suggestions.length === 0) return;
+        
+        const chatInput = document.getElementById('chat-input');
+        const container = document.createElement('div');
+        container.id = 'chat-suggestions';
+        container.className = 'position-absolute bg-white border rounded-3 shadow-lg overflow-hidden';
+        container.style.cssText = `bottom: 100%; left: 10px; right: 10px; z-index: 10; max-height: 150px; overflow-y: auto;`;
+        
+        suggestions.slice(0, 4).forEach(s => {
+            const item = document.createElement('div');
+            item.className = 'p-2 px-3 text-start small';
+            item.style.cssText = 'cursor: pointer;';
+            item.onmouseover = () => item.style.background = '#f0f0f0';
+            item.onmouseout = () => item.style.background = 'white';
+            item.textContent = s.text;
+            item.onclick = () => {
+                chatInput.value = s.query;
+                ChatBot.hideSuggestions();
+            };
+            container.appendChild(item);
+        });
+        
+        chatInput.parentElement.style.position = 'relative';
+        chatInput.parentElement.appendChild(container);
+    },
+
+    hideSuggestions() {
+        const el = document.getElementById('chat-suggestions');
+        if (el) el.remove();
+    },
+
+    // ==========================================
+    // 12. MESSAGE DE BIENVENUE
+    // ==========================================
+    sendWelcomeMessage() {
+        const user = getCurrentUser();
+        const name = user?.name || '';
+        
+        let welcome = name ? `Bonjour ${name} ! 👋` : "Bonjour ! 👋";
+        welcome += "\n\nJe suis l'assistant virtuel EventHub Fès 🤖\nVous pouvez me demander :";
+        
+        ChatBot.appendMessage('bot', welcome);
+        
+        setTimeout(() => {
+            ChatBot.appendQuickReplies(ChatBot.quickReplies);
+        }, 300);
     }
-    function appendChatMessage(sender, text) { const div = document.createElement('div'); div.className = `mb-2 ${sender === 'user' ? 'text-end' : 'text-start'}`; const bgColor = sender === 'user' ? 'bg-primary text-white' : 'bg-light text-dark shadow-sm'; div.innerHTML = `<div class="d-inline-block p-2 px-3 ${bgColor}" style="border-radius:10px; max-width:85%; font-size:0.9rem;">${escapeHtml(text)}</div>`; chatMessages.appendChild(div); chatMessages.scrollTop = chatMessages.scrollHeight; }
-    function getBotResponse(input) { const msg = input.toLowerCase(); if (msg.includes('bonjour') || msg.includes('salam')) return "Bonjour ! Comment puis-je vous aider aujourd'hui ?"; if (msg.includes('événement') || msg.includes('event')) return `Nous avons actuellement ${EVENTS.length} événements disponibles.`; if (msg.includes('gratuit')) return "Oui, nous avons des événements gratuits !"; return "Pour une aide spécifique, contactez-nous au +212 5XX-XXXXXX."; }
-}
+};
+
+// ==========================================
+// CSS REQUIS
+// ==========================================
+(function injectChatStyles() {
+    if (!document.getElementById('chatbot-styles')) {
+        const style = document.createElement('style');
+        style.id = 'chatbot-styles';
+        style.textContent = `
+            @keyframes typingBounce {
+                0%, 60%, 100% { transform: translateY(0); }
+                30% { transform: translateY(-5px); }
+            }
+            
+            #chat-window {
+                position: fixed;
+                bottom: 90px;
+                right: 25px;
+                width: 380px;
+                height: 500px;
+                z-index: 9999;
+                border-radius: 20px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            @media (max-width: 480px) {
+                #chat-window {
+                    width: calc(100% - 20px);
+                    right: 10px;
+                    bottom: 80px;
+                    height: 70vh;
+                }
+            }
+            
+            #chat-messages {
+                flex: 1;
+                overflow-y: auto;
+                padding: 15px;
+                background: #f8f9fa;
+            }
+            
+            #chat-toggle {
+                position: fixed;
+                bottom: 25px;
+                right: 25px;
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                z-index: 9998;
+                border: none;
+                font-size: 1.5rem;
+                transition: transform 0.3s, box-shadow 0.3s;
+            }
+            
+            #chat-toggle:hover {
+                transform: scale(1.1);
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            }
+            
+            #chat-form {
+                padding: 10px 15px;
+                background: white;
+                border-top: 1px solid #eee;
+            }
+            
+            #chat-input {
+                border: 2px solid #e0e0e0;
+                border-radius: 25px;
+                padding: 10px 20px;
+                transition: border-color 0.3s;
+            }
+            
+            #chat-input:focus {
+                border-color: #0d6efd;
+                outline: none;
+            }
+            
+            .chat-header {
+                background: linear-gradient(135deg, #0d6efd, #6610f2);
+                color: white;
+                padding: 15px 20px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            
+            .chat-header .online-dot {
+                width: 10px;
+                height: 10px;
+                background: #198754;
+                border-radius: 50%;
+                display: inline-block;
+                animation: pulse 2s infinite;
+            }
+            
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+})();
+
+// ==========================================
+// HTML REQUIS (À ajouter dans vos pages HTML)
+// ==========================================
+/*
+<!-- Bouton d'ouverture du chat -->
+<button id="chat-toggle" class="btn btn-primary shadow-lg">
+    <i class="fas fa-comments"></i>
+</button>
+
+<!-- Fenêtre de chat -->
+<div id="chat-window" class="d-none bg-white">
+    <div class="chat-header">
+        <div class="position-relative">
+            <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                <i class="fas fa-robot fs-5"></i>
+            </div>
+            <span class="online-dot position-absolute" style="bottom:0;right:0;border:2px solid white;"></span>
+        </div>
+        <div>
+            <h6 class="mb-0 fw-bold">Assistant EventHub</h6>
+            <small class="opacity-75">En ligne • Fès</small>
+        </div>
+        <button class="btn btn-sm btn-outline-light ms-auto rounded-circle" onclick="document.getElementById('chat-window').classList.add('d-none')">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    
+    <div id="chat-messages"></div>
+    
+    <form id="chat-form" class="d-flex gap-2">
+        <input type="text" id="chat-input" class="form-control flex-grow-1" placeholder="Écrivez votre message..." autocomplete="off">
+        <button type="submit" class="btn btn-primary rounded-circle" style="width:45px;height:45px;">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </form>
+</div>
+*/
+
+// ==========================================
+// Remplacement de l'ancien initChatBot
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    ChatBot.init();
+});
 
 // ==========================================
 // 16. MODE NUIT & UI PRO
@@ -759,6 +1771,125 @@ initAuthUI = function() {
     originalInitAuthUI();
     initNotifications();
 };
+
+
+// ==========================================
+// FIX: MODALES CONNEXION / INSCRIPTION + REGISTER
+// ==========================================
+
+function showLoginModal() {
+    const choiceModal = document.getElementById('authChoiceModal');
+    if (choiceModal) {
+        const instance = bootstrap.Modal.getInstance(choiceModal);
+        if (instance) instance.hide();
+    }
+    setTimeout(() => {
+        const loginEl = document.getElementById('loginModal');
+        if (loginEl) {
+            bootstrap.Modal.getOrCreateInstance(loginEl).show();
+        } else if (choiceModal) {
+            const loginTab = document.getElementById('login-tab');
+            if (loginTab) new bootstrap.Tab(loginTab).show();
+            bootstrap.Modal.getOrCreateInstance(choiceModal).show();
+        }
+    }, 300);
+}
+
+function showRegisterModal() {
+    const choiceModal = document.getElementById('authChoiceModal');
+    if (choiceModal) {
+        const instance = bootstrap.Modal.getInstance(choiceModal);
+        if (instance) instance.hide();
+    }
+    setTimeout(() => {
+        const registerEl = document.getElementById('registerModal');
+        if (registerEl) {
+            bootstrap.Modal.getOrCreateInstance(registerEl).show();
+        } else if (choiceModal) {
+            const registerTab = document.getElementById('register-tab');
+            if (registerTab) new bootstrap.Tab(registerTab).show();
+            bootstrap.Modal.getOrCreateInstance(choiceModal).show();
+        }
+    }, 300);
+}
+
+
+
+function setupRegisterForm() {
+    const registerForm = document.getElementById('register-form');
+    if (!registerForm) return;
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('register-name').value.trim();
+        const email = document.getElementById('register-email').value.trim();
+        const password = document.getElementById('register-password').value;
+        const password_confirmation = document.getElementById('register-password-confirm') ? document.getElementById('register-password-confirm').value : password;
+
+        if (!name || !email || !password) {
+            Swal.fire('Erreur', 'Veuillez remplir tous les champs.', 'error');
+            return;
+        }
+        if (password !== password_confirmation) {
+            Swal.fire('Erreur', 'Les mots de passe ne correspondent pas.', 'error');
+            return;
+        }
+        if (password.length < 6) {
+            Swal.fire('Erreur', 'Le mot de passe doit contenir au moins 6 caractères.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ name, email, password, password_confirmation })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && (data.success || data.token)) {
+                if (data.data && data.data.token && data.data.user) {
+                    setCurrentUser(data.data.user, data.data.token);
+                } else if (data.token && data.user) {
+                    setCurrentUser(data.user, data.token);
+                }
+
+                const regModal = document.getElementById('registerModal');
+                if (regModal) { const inst = bootstrap.Modal.getInstance(regModal); if (inst) inst.hide(); }
+
+                Swal.fire({ icon: 'success', title: 'Bienvenue !', text: 'Compte créé avec succès.' }).then(() => location.reload());
+            } else {
+                let errorMsg = 'Erreur lors de l\'inscription.';
+                if (data.message) errorMsg = data.message;
+                else if (data.errors) {
+                    errorMsg = typeof data.errors === 'object' ? Object.values(data.errors).flat().join('\n') : data.errors;
+                }
+                Swal.fire('Erreur', errorMsg, 'error');
+            }
+        } catch (error) {
+            console.error('Erreur inscription:', error);
+            Swal.fire('Erreur Serveur', 'Impossible de contacter le serveur.', 'error');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        setupRegisterForm();
+
+        document.querySelectorAll('.btn-connexion, [data-auth-action="login"], .go-to-login').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showLoginModal(); });
+        });
+        document.querySelectorAll('.btn-inscription, [data-auth-action="register"], .go-to-register').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showRegisterModal(); });
+        });
+    }, 1000);
+});
+
+window.showLoginModal = showLoginModal;
+window.showRegisterModal = showRegisterModal;
 
 // ==========================================
 // 17. EXPOSITION GLOBALE

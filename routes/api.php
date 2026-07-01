@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\UserController;
 
 use App\Http\Controllers\PaymentController;
 use App\Models\Event;
@@ -36,6 +37,34 @@ Route::post('/stripe-webhook', [PaymentController::class, 'handleWebhook']);
 */
 Route::middleware('auth:sanctum')->group(function () {
 
+// إذا كنتي كتستعمل Route::apiResource، زيد هاد السطر فقط:
+Route::delete('my-bookings/{id}', [BookingController::class, 'destroyMyBooking'])->middleware('auth:sanctum');
+
+// إذا كنتي كتبغي route عادية، هادكا يكفي:
+Route::delete('/my-bookings/{id}', [BookingController::class, 'destroyMyBooking'])->middleware('auth:sanctum');
+
+// بيانات المستخدم الحالي
+    Route::get('/user', [UserController::class, 'show']);
+
+    // قائمة المستخدمين
+    Route::get('/users', [UserController::class, 'index']);
+
+    // حذف مستخدم
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
+
+    // إحصائيات
+    Route::get('/admin/stats', [UserController::class, 'stats']);
+
+
+// حجوزات المستخدم
+    Route::get('/my-bookings', [BookingController::class, 'myBookings']);
+    
+    // تحديث الملف الشخصي
+    Route::put('/user/update', [UserController::class, 'updateProfile']);
+    
+    // حذف الحساب
+    Route::delete('/user/delete', [UserController::class, 'deleteAccount']);
+
     // تم إصلاح هذا السطر (إزالة التكرار غير الضروري)
     Route::post('/pay', [PaymentController::class, 'createCheckoutSession']);
 
@@ -56,7 +85,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bookings/ticket/{booking_number}', [BookingController::class, 'getTicketData']);
 
     // نظام التقييمات
-    Route::post('/reviews', [ReviewController::class, 'store']);
+    Route::get('/events/{event_id}/reviews', [ReviewController::class, 'index'])->where('event_id', '[0-9]+');
+    Route::post('/events/{event_id}/reviews', [ReviewController::class, 'store'])->where('event_id', '[0-9]+');
 
     /*
     |--------------------------------------------------------------------------

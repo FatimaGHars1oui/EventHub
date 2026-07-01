@@ -18,6 +18,14 @@
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .sidebar-divider { border-color: #334155; margin: 15px 20px; }
         #user-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+        
+        .scanner-modal .modal-content { background: #1a1d21; color: white; border: 1px solid #3d444d; border-radius: 20px; }
+        .scanner-container { position: relative; width: 100%; max-width: 400px; margin: 0 auto; border-radius: 15px; overflow: hidden; border: 2px solid #6366f1; box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+        #reader { width: 100% !important; border: none !important; }
+        .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #22c55e; box-shadow: 0 0 15px #22c55e; z-index: 10; animation: moveScanLine 2s linear infinite; }
+        @keyframes moveScanLine { 0% { top: 0; } 100% { top: 100%; } }
+        .scan-btn-float { position: fixed; bottom: 30px; left: 30px; z-index: 1050; padding: 15px 25px; font-weight: 600; letter-spacing: 0.5px; transition: all 0.3s ease; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4); }
+        .scan-btn-float:hover { transform: translateY(-5px); box-shadow: 0 15px 25px rgba(99, 102, 241, 0.6); }
     </style>
 </head>
 <body>
@@ -79,39 +87,35 @@
             </div>
         </div>
 
-        <!-- Section 2: Bookings -->
+        <!-- Section 2: Bookings (تم حذف زر التصدير من هنا) -->
         <div id="bookings" class="dashboard-section">
-            <div class="card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="mb-0">Mes Réservations</h4>
-                    <button class="btn btn-success btn-sm" onclick="exportToExcel('bookings-table','reservations.xlsx')">
-                        <i class="fas fa-file-excel me-1"></i> Exporter Excel
-                    </button>
-                </div>
-                <table class="table">
-                    <thead><tr><th>ID</th><th>Événement</th><th>Date</th><th>Statut</th><th>Action</th></tr></thead>
-                    <tbody id="bookings-table"></tbody>
-                </table>
-            </div>
+    <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">Mes Réservations</h4>
+            <div id="export-wrapper-bookings"></div>
         </div>
+        <table class="table">
+            <thead><tr><th>ID</th><th>Événement</th><th>Date</th><th>Statut</th><th>Action</th></tr></thead>
+            <tbody id="bookings-table"></tbody>
+        </table>
+    </div>
+</div>
 
-        <!-- Section 3: My Events (Organizer + Admin) -->
+        <!-- Section 3: My Events (تم حذف زر التصدير من هنا) -->
         <div id="my-events" class="dashboard-section">
-            <div class="card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="mb-0">Mes Événements</h4>
-                    <button class="btn btn-success btn-sm" onclick="exportToExcel('events-table','evenements.xlsx')">
-                        <i class="fas fa-file-excel me-1"></i> Exporter Excel
-                    </button>
-                </div>
-                <table class="table">
-                    <thead><tr><th>Titre</th><th>Catégorie</th><th>Date</th><th>Ville</th><th>Prix</th></tr></thead>
-                    <tbody id="events-table"></tbody>
-                </table>
-            </div>
+    <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">Mes Événements</h4>
+            <div id="export-wrapper-events"></div>
         </div>
+        <table class="table">
+            <thead><tr><th>Titre</th><th>Catégorie</th><th>Date</th><th>Ville</th><th>Prix</th><th>Action</th></tr></thead>
+            <tbody id="events-table"></tbody>
+        </table>
+    </div>
+</div>
 
-        <!-- Section 4: Add Event (Organizer + Admin) -->
+        <!-- Section 4: Add Event -->
         <div id="add-event" class="dashboard-section">
             <div class="card p-4">
                 <h4 class="mb-4">Ajouter un événement</h4>
@@ -163,7 +167,7 @@
             </div>
         </div>
 
-        <!-- Section 5: Admin Stats (Admin uniquement) -->
+        <!-- Section 5: Admin Stats (تم حذف زر التصدير من هنا) -->
         <div id="admin-stats" class="dashboard-section">
             <div class="row g-4 mb-4">
                 <div class="col-md-3">
@@ -199,38 +203,35 @@
                     </div>
                 </div>
                 <div class="col-md-7">
-                    <div class="card p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">Dernières réservations</h6>
-                            <button class="btn btn-success btn-sm" onclick="exportToExcel('admin-recent-bookings','recent_bookings.xlsx')">
-                                <i class="fas fa-file-excel me-1"></i> Exporter Excel
-                            </button>
-                        </div>
-                        <table class="table table-sm">
-                            <thead><tr><th>ID</th><th>Client</th><th>Événement</th><th>Date</th></tr></thead>
-                            <tbody id="admin-recent-bookings"></tbody>
-                        </table>
-                    </div>
-                </div>
+    <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Dernières réservations</h6>
+            <div id="export-wrapper-recent"></div>
+        </div>
+        <table class="table table-sm">
+            <thead><tr><th>ID</th><th>Client</th><th>Événement</th><th>Date</th></tr></thead>
+            <tbody id="admin-recent-bookings"></tbody>
+        </table>
+    </div>
+</div>
             </div>
         </div>
 
-        <!-- Section 6: Admin Users Management (Admin uniquement) -->
+        <!-- Section 6: Admin Users (تم حذف زر التصدير من هنا) -->
         <div id="admin-users" class="dashboard-section">
-            <div class="card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="mb-0">Gestion des Utilisateurs</h4>
-                    <button class="btn btn-success btn-sm" onclick="exportToExcel('users-table','utilisateurs.xlsx')">
-                        <i class="fas fa-file-excel me-1"></i> Exporter Excel
-                    </button>
-                </div>
-                <table class="table">
-                    <thead><tr><th>ID</th><th>Nom</th><th>Email</th><th>Rôle</th><th>Action</th></tr></thead>
-                    <tbody id="users-table"></tbody>
-                </table>
-                <div id="users-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
-            </div>
+    <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">Gestion des Utilisateurs</h4>
+            <div id="export-wrapper-users"></div>
         </div>
+        <table class="table">
+            <thead><tr><th>ID</th><th>Nom</th><th>Email</th><th>Rôle</th><th>Action</th></tr></thead>
+            <tbody id="users-table"></tbody>
+        </table>
+        <div id="users-pagination" class="d-flex justify-content-center align-items-center gap-2 mt-3"></div>
+    </div>
+</div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

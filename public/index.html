@@ -225,7 +225,7 @@
                     <li class="nav-item"><a class="nav-link" href="#footer">À Propos</a></li>
                 </ul>
                 
-                <!-- تم تعديل هذا الجزء لإضافة الجرس والإخفاء الصحيح -->
+                <!-- التعديل 1: استبدال data-bs-target بالكلاسات الجديدة -->
                 <div id="auth-buttons" class="d-flex gap-2 align-items-center">
                     <!-- حاوية الإشعارات (تظهر فقط للمسجلين) -->
                     <div class="dropdown" id="notifications-wrapper" style="display: none;">
@@ -247,8 +247,8 @@
                     <button class="btn btn-outline-light rounded-pill px-3" onclick="toggleDarkMode()" title="Mode Nuit">
                         <i class="fas fa-moon"></i>
                     </button>
-                    <button class="btn btn-outline-light rounded-pill px-4 auth-guest-btn" data-bs-toggle="modal" data-bs-target="#authChoiceModal">Connexion</button>
-                    <button class="btn btn-premium auth-guest-btn" data-bs-toggle="modal" data-bs-target="#authChoiceModal">Inscription</button>
+                    <button class="btn btn-outline-light rounded-pill px-4 auth-guest-btn go-to-login">Connexion</button>
+                    <button class="btn btn-premium auth-guest-btn go-to-register">Inscription</button>
                 </div>
             </div>
         </div>
@@ -360,6 +360,7 @@
         </div>
     </div>
 
+    <!-- ===== مودال تسجيل الدخول ===== -->
     <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content rounded-4">
@@ -384,6 +385,7 @@
         </div>
     </div>
 
+    <!-- ===== مودال التسجيل (مع حقل تأكيد كلمة السر المُضاف) ===== -->
     <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content rounded-4">
@@ -405,6 +407,11 @@
                             <label for="register-password" class="form-label">Mot de passe</label>
                             <input type="password" id="register-password" class="form-control" required minlength="8">
                         </div>
+                        <!-- التعديل 3: حقل تأكيد كلمة السر المُضاف -->
+                        <div class="mb-3">
+                            <label for="register-password-confirm" class="form-label">Confirmer le mot de passe</label>
+                            <input type="password" id="register-password-confirm" class="form-control" required minlength="8">
+                        </div>
                         <button type="submit" class="btn btn-success w-100 rounded-pill">Créer un compte</button>
                     </form>
                 </div>
@@ -412,6 +419,7 @@
         </div>
     </div>
 
+    <!-- ===== مودال التذكرة ===== -->
     <div class="modal fade" id="ticketModal" tabindex="-1" aria-labelledby="ticketModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content text-dark" style="border-radius: 16px; border: none; background: #ffffff;">
@@ -476,7 +484,7 @@
         </div>
     </div>
 
-    <!-- Modal Choice: Connexion ou Inscription -->
+    <!-- ===== التعديل 2: مودال الاختيار - الأزرار تستخدم data-bs-dismiss + الكلاسات الجديدة ===== -->
     <div class="modal fade" id="authChoiceModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
@@ -490,11 +498,11 @@
                     <p class="text-muted">Vous devez avoir un compte pour réserver vos places aux événements.</p>
                     
                     <div class="d-grid gap-3 mt-4">
-                        <button class="btn btn-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <button class="btn btn-primary btn-lg rounded-pill go-to-login" data-bs-dismiss="modal">
                             <i class="fas fa-sign-in-alt me-2"></i>Se connecter
                         </button>
                         
-                        <button class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#registerModal">
+                        <button class="btn btn-outline-primary btn-lg rounded-pill go-to-register" data-bs-dismiss="modal">
                             <i class="fas fa-user-plus me-2"></i>Créer un compte
                         </button>
                     </div>

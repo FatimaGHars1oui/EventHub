@@ -1,7 +1,6 @@
 /**
  * EventHub - Dashboard Logic (Unifié)
  * يتحكم فـ 3 أنواع ديال المستخدمين: Admin / Organizer / User
- * Gère l'UI, l'authentification et toutes les requêtes API du tableau de bord.
  */
 
 var API_URL = "http://127.0.0.1:8000/api";
@@ -14,11 +13,7 @@ document.addEventListener('DOMContentLoaded', (e) => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
 
-    console.log("Dashboard Init: Token:", token, "User:", userStr);
-
-    // 1. التحقق من التوكن والبيانات (معالجة Corruption)
     if (!token) {
-        console.warn("Session expirée ou invalide");
         logout();
         return;
     }
@@ -28,12 +23,10 @@ document.addEventListener('DOMContentLoaded', (e) => {
         initUI(user);
         showSection('overview');
 
-        // ربط الـ Form ديال إضافة فعالية
         const addEventForm = document.getElementById('add-event-form');
         if (addEventForm) addEventForm.addEventListener('submit', handleAddEvent);
 
     } catch (e) {
-        console.error("Critical error during init:", e);
         logout();
     }
 });
@@ -44,12 +37,10 @@ document.addEventListener('DOMContentLoaded', (e) => {
 function initUI(user) {
     if (!user) return;
 
-    // حماية ضد خطأ toUpperCase (استخدام "user" كقيمة افتراضية)
     const role = (user.role || 'user').toLowerCase();
     currentUserRole = role;
     const name = user.name || 'Utilisateur';
 
-    // تحديث المعلومات
     updateText('user-name', name);
     updateText('user-email', user.email || '');
     updateText('welcome-msg', `Bonjour, ${name} 👋`);
@@ -58,10 +49,8 @@ function initUI(user) {
     const avatar = document.getElementById('user-avatar');
     if (avatar) avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`;
 
-    // التحكم في الرتب: نخبيو كل شي بالأول
     document.querySelectorAll('.admin-only, .organizer-only').forEach(el => el.style.display = 'none');
 
-    // Admin: عندو حقوق ديال الـ Organizer + حقوق ديالو الخاصة
     if (role === 'admin') {
         document.querySelectorAll('.admin-only, .organizer-only').forEach(el => el.style.display = 'block');
     } else if (role === 'organizer') {
@@ -72,17 +61,14 @@ function initUI(user) {
 function showSection(sectionId, evt) {
     const e = evt || window.event;
 
-    // تبديل شكل الروابط
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   
     if (e && e.currentTarget && e.currentTarget.classList) e.currentTarget.classList.add('active'); 
 
-    // تبديل الأقسام
     document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(sectionId);
     if (target) target.classList.add('active');
 
-    // تحميل البيانات حسب القسم المفتوح
     switch (sectionId) {
         case 'overview': loadOverviewStats(); initBookingsChart(); break;
         case 'bookings': loadBookings(); break;
@@ -117,13 +103,12 @@ async function fetchWithAuth(endpoint, options = {}) {
         }
         return response;
     } catch (err) {
-        console.error("Fetch Error:", err);
         return null;
     }
 }
 
 // ==========================================
-// 3. Vue d'ensemble (Overview) - tous les rôles
+// 3. Vue d'ensemble (Overview)
 // ==========================================
 async function loadOverviewStats() {
     const res = await fetchWithAuth('/stats/overview');
@@ -140,7 +125,6 @@ async function initBookingsChart() {
 
     if (bookingsChart) bookingsChart.destroy();
     
-    // جلب بيانات الحجوزات الحقيقية لآخر 7 أيام
     const res = await fetchWithAuth('/stats/overview-chart');
     let chartLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     let chartData = [0, 0, 0, 0, 0, 0, 0];
@@ -164,7 +148,7 @@ async function initBookingsChart() {
 }
 
 // ==========================================
-// 4. Mes Réservations - tous les rôles
+// 4. Mes Réservations (تم التعديل هنا لإضافة زر الحذف)
 // ==========================================
 async function loadBookings() {
     const tbody = document.getElementById('bookings-table');
@@ -178,7 +162,6 @@ async function loadBookings() {
     }
 
     const result = await res.json();
-    // تعديل هنا: التأكد من الوصول للمصفوفة سواء كانت مباشرة أو داخل Paginator
     const data = (result.data && Array.isArray(result.data.data)) ? result.data.data : (result.data || []);
 
     if (data.length === 0) {
@@ -192,7 +175,14 @@ async function loadBookings() {
             <td>${b.event ? b.event.title : 'N/A'}</td>
             <td>${new Date(b.created_at).toLocaleDateString('fr-FR')}</td>
             <td><span class="badge bg-${b.status === 'confirmed' ? 'success' : 'warning'}">${b.status}</span></td>
-            <td><button class="btn btn-sm btn-outline-primary" onclick="viewTicket('${b.booking_number || b.id}')">Détails</button></td>
+            <td>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewTicket('${b.booking_number || b.id}')">Détails</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking(${b.id}, ${b.event ? b.event.id : 'null'})">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            </td>
         </tr>
     `).join('');
 }
@@ -201,8 +191,46 @@ function viewTicket(ref) {
     Swal.fire('Billet', `Référence de la réservation: <b>${ref}</b>`, 'info');
 }
 
+async function deleteBooking(bookingId, eventId) {
+    const confirmResult = await Swal.fire({
+        title: 'Annuler cette réservation ?',
+        text: "Cette action est irréversible et votre place sera libérée.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Oui, annuler',
+        cancelButtonText: 'Non, garder',
+        confirmButtonColor: '#ef4444'
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    // رجعنا لرابط my-bookings اللي هو نفس مسار جلب الحجوزات
+    const res = await fetchWithAuth(`/my-bookings/${bookingId}`, { method: 'DELETE' });
+    
+    if (res && res.ok) {
+        if (eventId) {
+            let localBookings = JSON.parse(localStorage.getItem('my_bookings') || '[]');
+            localBookings = localBookings.filter(b => b.event_id != eventId);
+            localStorage.setItem('my_bookings', JSON.stringify(localBookings));
+        }
+        Swal.fire('Annulée !', 'Votre réservation a été annulée avec succès.', 'success');
+        loadBookings(); 
+    } else {
+        let errorMsg = 'Impossible d\'annuler cette réservation.';
+        if (res) {
+            try {
+                const errorData = await res.json();
+                errorMsg = errorData.message || `Erreur serveur (Code: ${res.status})`;
+            } catch (e) {
+                errorMsg = `Erreur 404: الرابط غير موجود في السيرفر.`;
+            }
+        }
+        Swal.fire('Erreur', errorMsg, 'error');
+    }
+}
+
 // ==========================================
-// 5. Mes Événements (Organizer + Admin) - CRUD شامل
+// 5. Mes Événements (Organizer + Admin)
 // ==========================================
 async function loadMyEvents() {
     const tbody = document.getElementById('events-table');
@@ -229,7 +257,6 @@ async function loadMyEvents() {
             page++;
         } while (page <= lastPage && page <= 5);
     } catch (err) {
-        console.error("Erreur chargement événements:", err);
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Erreur de chargement</td></tr>';
         return;
     }
@@ -260,13 +287,11 @@ async function loadMyEvents() {
     `).join('');
 }
 
-// دالة مساعدة لحماية نصوص HTML عند تمريرها كـ Parameters
 function escapeHtml(str) {
     return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
 async function editEvent(id, currentTitle, currentCity, currentPrice, currentCategoryId, currentDate) {
-    // جلب الأصناف أولاً لكي نعرضها في القائمة المنسدلة للتعديل
     let categoriesOptions = '';
     try {
         const catRes = await fetch(`${API_URL}/categories`);
@@ -274,9 +299,7 @@ async function editEvent(id, currentTitle, currentCity, currentPrice, currentCat
         categoriesOptions = (catResult.data || []).map(c => 
             `<option value="${c.id}" ${c.id == currentCategoryId ? 'selected' : ''}>${c.name}</option>`
         ).join('');
-    } catch (err) {
-        console.error("Erreur catégories", err);
-    }
+    } catch (err) {}
 
     const { value: formValues } = await Swal.fire({
         title: 'Modifier l\'événement',
@@ -315,7 +338,6 @@ async function editEvent(id, currentTitle, currentCity, currentPrice, currentCat
 
     if (!formValues) return;
 
-    // إرسال طلب التعديل (PUT / PATCH) عبر API
     const res = await fetchWithAuth(`/events/${id}`, {
         method: 'PUT',
         body: JSON.stringify(formValues)
@@ -323,7 +345,7 @@ async function editEvent(id, currentTitle, currentCity, currentPrice, currentCat
 
     if (res && res.ok) {
         Swal.fire('Succès', 'Événement modifié avec succès !', 'success');
-        loadMyEvents(); // تحديث الجدول تلقائياً
+        loadMyEvents();
     } else {
         Swal.fire('Erreur', 'Impossible de modifier l\'événement', 'error');
     }
@@ -346,7 +368,7 @@ async function deleteEvent(id) {
     
     if (res && res.ok) {
         Swal.fire('Supprimé', 'L\'événement a été supprimé.', 'success');
-        loadMyEvents(); // تحديث الجدول تلقائياً
+        loadMyEvents();
     } else {
         Swal.fire('Erreur', 'Erreur lors de la suppression de l\'événement', 'error');
     }
@@ -363,9 +385,7 @@ async function loadCategories() {
         const result = await res.json();
         select.innerHTML = '<option value="">-- Choisir une catégorie --</option>' +
             (result.data || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-    } catch (err) {
-        console.error("Erreur chargement catégories:", err);
-    }
+    } catch (err) {}
 }
 
 async function handleAddEvent(e) {
@@ -415,7 +435,6 @@ async function loadAdminStats() {
     updateText('admin-total-bookings', d.counters.total_bookings ?? 0);
     updateText('admin-total-revenue', `${d.counters.total_revenue ?? 0} DH`);
 
-    // رسم بياني: توزيع الفعاليات حسب الصنف
     const ctxCat = document.getElementById('categories-chart')?.getContext('2d');
     if (ctxCat && typeof Chart !== 'undefined') {
         if (categoriesChart) categoriesChart.destroy();
@@ -432,7 +451,6 @@ async function loadAdminStats() {
         });
     }
 
-    // جدول: آخر الحجوزات
     const tbody = document.getElementById('admin-recent-bookings');
     if (tbody) {
         const recent = d.recent_bookings || [];
@@ -447,24 +465,21 @@ async function loadAdminStats() {
             `).join('')
             : '<tr><td colspan="4" class="text-center text-muted py-3">Aucune réservation récente.</td></tr>';
     }
-}
 
-
-
-// أضف هذا في دالة loadAdminStats بعد رسم البيانات الأخرى
-const topEvents = d.top_events || [];
-const topEventsTable = document.getElementById('top-events-table');
-if (topEventsTable && topEvents.length > 0) {
-    topEventsTable.innerHTML = topEvents.map((ev, index) => `
-        <tr>
-            <td class="fw-bold">${index + 1}</td>
-            <td>${ev.title}</td>
-            <td><span class="badge bg-primary">${ev.total_bookings || 0}</span></td>
-            <td class="fw-bold text-success">${ev.total_revenue || 0} DH</td>
-        </tr>
-    `).join('');
-} else if (topEventsTable) {
-    topEventsTable.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>';
+    const topEvents = d.top_events || [];
+    const topEventsTable = document.getElementById('top-events-table');
+    if (topEventsTable && topEvents.length > 0) {
+        topEventsTable.innerHTML = topEvents.map((ev, index) => `
+            <tr>
+                <td class="fw-bold">${index + 1}</td>
+                <td>${ev.title}</td>
+                <td><span class="badge bg-primary">${ev.total_bookings || 0}</span></td>
+                <td class="fw-bold text-success">${ev.total_revenue || 0} DH</td>
+            </tr>
+        `).join('');
+    } else if (topEventsTable) {
+        topEventsTable.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Aucune donnée</td></tr>';
+    }
 }
 
 // ==========================================
@@ -564,15 +579,13 @@ function logout() {
 } 
 
 // ==========================================
-// 10. نافذة ماسح QR المتقدمة (Admin Premium UI)
+// 10. نافذة ماسح QR (Admin)
 // ==========================================
 (function initPremiumQRScanner() {
-    // 1. تحميل المكتبة اللازمة
     const script = document.createElement('script');
     script.src = "https://unpkg.com/html5-qrcode";
     document.head.appendChild(script);
 
-    // 2. إضافة التنسيقات الجمالية (CSS)
     const style = document.createElement('style');
     style.innerHTML = `
         .scanner-modal .modal-content {
@@ -595,7 +608,6 @@ function logout() {
             width: 100% !important;
             border: none !important;
         }
-        /* خط المسح المتحرك */
         .scan-line {
             position: absolute;
             top: 0;
@@ -633,7 +645,6 @@ function logout() {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         if (user.role !== 'admin') return;
 
-        // 3. إنشاء النافذة (HTML Modal)
         const modalHTML = `
             <div class="modal fade scanner-modal" id="adminScannerModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
@@ -705,68 +716,143 @@ function logout() {
         });
     };
 
-
-    // ==========================================
-// 11. تزامن الوضع الليلي مع الصفحة الرئيسية
-// ==========================================
-function initDashboardDarkMode() {
-    const isDark = localStorage.getItem('darkMode') === 'true';
-    if (isDark) {
-        document.documentElement.setAttribute('data-bs-theme', 'dark');
+    function initDashboardDarkMode() {
+        const isDark = localStorage.getItem('darkMode') === 'true';
+        if (isDark) {
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+        }
+        const btn = document.querySelector('.fa-moon, .fa-sun');
+        if(btn) {
+            btn.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        }
     }
-    // تحديث أيقونة الزر
-    const btn = document.querySelector('.fa-moon, .fa-sun');
-    if(btn) {
-        btn.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-    }
-}
 
-function toggleDarkMode() {
-    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-    document.documentElement.setAttribute('data-bs-theme', isDark ? 'light' : 'dark');
-    localStorage.setItem('darkMode', !isDark);
-    
-    const btn = document.querySelector('.fa-moon, .fa-sun');
-    if(btn) {
-        btn.className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+    function toggleDarkMode() {
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        document.documentElement.setAttribute('data-bs-theme', isDark ? 'light' : 'dark');
+        localStorage.setItem('darkMode', !isDark);
+        
+        const btn = document.querySelector('.fa-moon, .fa-sun');
+        if(btn) {
+            btn.className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+        }
     }
-}
 
-// تشغيل الوضع الليلي فور فتح الداشبورد
-document.addEventListener('DOMContentLoaded', initDashboardDarkMode);
+    document.addEventListener('DOMContentLoaded', initDashboardDarkMode);
 })();
 
 // ==========================================
-// تصدير الجداول إلى Excel (Export Feature)
+// 11. مكتبة SheetJS للتصدير إلى Excel
 // ==========================================
-function exportTableToCSV(tableId, filename = 'export.csv') {
-    const table = document.getElementById(tableId);
-    if (!table) return;
-    
-    let csv = [];
-    const rows = table.querySelectorAll('tr');
-    
-    rows.forEach(row => {
-        const cols = row.querySelectorAll('td, th');
-        const rowData = [];
-        cols.forEach(col => rowData.push(`"${col.innerText.trim()}"`));
-        csv.push(rowData.join(","));
-    });
-    
-    const blob = new Blob(["\uFEFF" + csv.join("\n")], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-}
+(function loadSheetJS() {
+    if (typeof XLSX !== 'undefined') return;
+    const s = document.createElement('script');
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    document.head.appendChild(s);
+})();
 
-function exportTableToExcel(tableId, filename = 'export.xlsx') {
+// ==========================================
+// 12. دالة التصدير إلى Excel (دالة موحدة بدون تكرار)
+// ==========================================
+function exportToExcel(tableId, filename) {
     const table = document.getElementById(tableId);
-    if (!table) return;
-    
-    const wb = XLSX.utils.table_to_booklet(table, { sheet: "Data" });
+    if (!table) {
+        Swal.fire('Erreur', 'Tableau introuvable', 'error');
+        return;
+    }
+
+    if (typeof XLSX === 'undefined') {
+        Swal.fire('Chargement', 'Veuillez réessayer dans quelques secondes...', 'info');
+        return;
+    }
+
+    const cleanTable = table.cloneNode(true);
+    cleanTable.querySelectorAll('td:last-child, th:last-child').forEach(el => el.remove());
+
+    const wb = XLSX.utils.table_to_book(cleanTable, { sheet: "Données" });
+
+    const ws = wb.Sheets["Données"];
+    const colWidths = [];
+    if (ws['!ref']) {
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let c = range.s.c; c <= range.e.c; c++) {
+            let maxLen = 10;
+            for (let r = range.s.r; r <= range.e.r; r++) {
+                const cell = ws[XLSX.utils.encode_cell({ r, c })];
+                if (cell && cell.v) {
+                    const len = String(cell.v).length;
+                    if (len > maxLen) maxLen = len;
+                }
+            }
+            colWidths.push({ wch: maxLen + 3 });
+        }
+        ws['!cols'] = colWidths;
+    }
+
     XLSX.writeFile(wb, filename);
 }
+
+// ==========================================
+// 13. حقن أزرار التصدير فوق الجداول
+// ==========================================
+(function injectExportButtons() {
+    const exportConfigs = [
+        { wrapperId: 'export-wrapper-bookings', tableId: 'bookings-table', label: 'Réservations', filename: 'mes_reservations.xlsx' },
+        { wrapperId: 'export-wrapper-events', tableId: 'events-table', label: 'Événements', filename: 'mes_evenements.xlsx' },
+        { wrapperId: 'export-wrapper-recent', tableId: 'admin-recent-bookings', label: 'Récentes', filename: 'reservations_recentes.xlsx' },
+        { wrapperId: 'export-wrapper-users', tableId: 'users-table', label: 'Utilisateurs', filename: 'utilisateurs.xlsx' }
+    ];
+
+    const observer = new MutationObserver(() => {
+        exportConfigs.forEach(cfg => {
+            const wrapper = document.getElementById(cfg.wrapperId);
+            const table = document.getElementById(cfg.tableId);
+            
+            // إذا كان المكان موجود والجدول فيه بيانات، وزر التصدير ما زال مازال ما تزادش
+            if (wrapper && table && table.rows.length > 1 && !wrapper.innerHTML.trim()) {
+                wrapper.innerHTML = `
+                    <button 
+                        class="btn btn-success btn-sm" 
+                        onclick="exportToExcel('${cfg.tableId}', '${cfg.filename}')"
+                        title="Exporter vers Excel"
+                    >
+                        <i class="fas fa-file-excel me-1"></i> Exporter ${cfg.label}
+                    </button>
+                `;
+            }
+        });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+})();
+
+// ==========================================
+// 14. اختصار لوحة المفاتيح: Ctrl+E للتصدير السريع
+// ==========================================
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+
+        const activeSection = document.querySelector('.dashboard-section.active');
+        if (!activeSection) return;
+
+        const table = activeSection.querySelector('table');
+        if (!table || !table.id) {
+            Swal.fire('Info', 'Aucun tableau à exporter dans cette section', 'info');
+            return;
+        }
+
+        const names = {
+            'bookings-table': 'mes_reservations.xlsx',
+            'events-table': 'mes_evenements.xlsx',
+            'admin-recent-bookings': 'reservations_recentes.xlsx',
+            'top-events-table': 'top_evenements.xlsx',
+            'users-table': 'utilisateurs.xlsx'
+        };
+
+        exportToExcel(table.id, names[table.id] || 'export.xlsx');
+    }
+});
 
 function openProfileSettings() {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -797,8 +883,6 @@ function openProfileSettings() {
             });
             
             if (res && res.ok) {
-                const data = await res.json();
-                // تحديث البيانات محلياً فوراً بدون إعادة تحميل الصفحة
                 const updatedUser = JSON.parse(localStorage.getItem('user'));
                 updatedUser.name = result.value.name;
                 updatedUser.email = result.value.email;
@@ -812,127 +896,3 @@ function openProfileSettings() {
         }
     });
 }
-
-// ==========================================
-// 12. مكتبة SheetJS للتصدير إلى Excel الحقيقي
-// ==========================================
-(function loadSheetJS() {
-    if (typeof XLSX !== 'undefined') return; // تجنب التحميل المتكرر
-    const s = document.createElement('script');
-    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
-    document.head.appendChild(s);
-})();
-
-// ==========================================
-// 13. دالة التصدير إلى Excel (نسخة مصححة ومحسّنة)
-// ==========================================
-function exportToExcel(tableId, filename) {
-    const table = document.getElementById(tableId);
-    if (!table) {
-        Swal.fire('Erreur', 'Tableau introuvable', 'error');
-        return;
-    }
-
-    if (typeof XLSX === 'undefined') {
-        Swal.fire('Chargement', 'Veuillez réessayer dans quelques secondes...', 'info');
-        return;
-    }
-
-    // إزالة أعمدة الإجراءات (الأزرار) من التصدير
-    const cleanTable = table.cloneNode(true);
-    cleanTable.querySelectorAll('td:last-child, th:last-child').forEach(el => el.remove());
-
-    const wb = XLSX.utils.table_to_book(cleanTable, { sheet: "Données" });
-
-    // تعيين عرض الأعمدة تلقائياً
-    const ws = wb.Sheets["Données"];
-    const colWidths = [];
-    if (ws['!ref']) {
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for (let c = range.s.c; c <= range.e.c; c++) {
-            let maxLen = 10;
-            for (let r = range.s.r; r <= range.e.r; r++) {
-                const cell = ws[XLSX.utils.encode_cell({ r, c })];
-                if (cell && cell.v) {
-                    const len = String(cell.v).length;
-                    if (len > maxLen) maxLen = len;
-                }
-            }
-            colWidths.push({ wch: maxLen + 3 });
-        }
-        ws['!cols'] = colWidths;
-    }
-
-    XLSX.writeFile(wb, filename);
-}
-
-// ==========================================
-// 14. حقن أزرار التصدير في كل جدول تلقائياً
-// ==========================================
-(function injectExportButtons() {
-    const exportConfigs = [
-        { tableId: 'bookings-table', section: 'bookings', label: 'Réservations', filename: 'mes_reservations.xlsx' },
-        { tableId: 'events-table', section: 'my-events', label: 'Événements', filename: 'mes_evenements.xlsx' },
-        { tableId: 'admin-recent-bookings', section: 'admin-stats', label: 'Réservations récentes', filename: 'reservations_recentes.xlsx' },
-        { tableId: 'top-events-table', section: 'admin-stats', label: 'Top événements', filename: 'top_evenements.xlsx' },
-        { tableId: 'users-table', section: 'admin-users', label: 'Utilisateurs', filename: 'utilisateurs.xlsx' }
-    ];
-
-    const observer = new MutationObserver(() => {
-        exportConfigs.forEach(cfg => {
-            const section = document.getElementById(cfg.section);
-            if (!section || !section.classList.contains('active')) return;
-
-            const table = document.getElementById(cfg.tableId);
-            if (!table || table.dataset.exportInjected) return;
-
-            // إنشاء زر التصدير
-            const btnWrapper = document.createElement('div');
-            btnWrapper.className = 'd-flex justify-content-end mb-3';
-            btnWrapper.innerHTML = `
-                <button 
-                    class="btn btn-success btn-sm" 
-                    onclick="exportToExcel('${cfg.tableId}', '${cfg.filename}')"
-                    title="Exporter vers Excel"
-                >
-                    <i class="fas fa-file-excel me-1"></i> Exporter ${cfg.label} (.xlsx)
-                </button>
-            `;
-
-            table.parentNode.insertBefore(btnWrapper, table);
-            table.dataset.exportInjected = 'true';
-        });
-    });
-
-    // مراقبة كل تغيير في الداشبورد
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-})();
-
-// ==========================================
-// 15. اختصار لوحة المفاتيح: Ctrl+E للتصدير السريع
-// ==========================================
-document.addEventListener('keydown', function(e) {
-    if (e.ctrlKey && e.key === 'e') {
-        e.preventDefault();
-
-        // البحث عن الجدول النشط حالياً
-        const activeSection = document.querySelector('.dashboard-section.active');
-        if (!activeSection) return;
-
-        const table = activeSection.querySelector('table');
-        if (!table || !table.id) {
-            Swal.fire('Info', 'Aucun tableau à exporter dans cette section', 'info');
-            return;
-        }
-
-        const names = {
-            'bookings-table': 'mes_reservations.xlsx',
-            'events-table': 'mes_evenements.xlsx',
-            'admin-recent-bookings': 'reservations_recentes.xlsx',
-            'top-events-table': 'top_evenements.xlsx',
-            'users-table': 'utilisateurs.xlsx'
-        };
-
-        exportToExcel(table.id, names[table.id] || 'export.xlsx');
-    }
-});

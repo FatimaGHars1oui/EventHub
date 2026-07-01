@@ -77,4 +77,42 @@ class ReviewController extends Controller
             'data'    => $reviews
         ]);
     }
+    /**
+     * جلب تقييمات المستخدم الحالي
+     */
+    public function myReviews(Request $request): JsonResponse
+    {
+        $reviews = Review::where('user_id', $request->user()->id)
+            ->with('event:id,title')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $reviews
+        ]);
+    }
+
+    /**
+     * حذف تقييم المستخدم (يقدر يمسح غير تقييماتو)
+     */
+    public function deleteMyReview(Request $request, $id): JsonResponse
+    {
+        $review = Review::where('id', $id)
+            ->where('user_id', $request->user()->id) // حماية: يمسح غير ديالو
+            ->first();
+
+        if (!$review) {
+            return response()->json(['success' => false, 'message' => 'Avis introuvable'], 404);
+        }
+
+        $review->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Avis supprimé.'
+        ]);
+    }
+
+
 }
